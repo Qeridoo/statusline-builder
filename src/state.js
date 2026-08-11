@@ -3,6 +3,7 @@
 import { CATALOG_BY_ID, REFERENCE_ORDER, isBlock } from './catalog.js';
 import { DEFAULT_INSTALL_PATH, MAX_LINES, INSTALL_PATHS } from './generate.js';
 import { DEFAULT_SEPARATOR } from './render.js';
+import { detectLang, setLang, LANGS } from './i18n.js';
 
 const KEY = 'statusline-builder:v1';
 
@@ -22,6 +23,7 @@ export function defaultState() {
   const os = detectOs();
   return {
     os,
+    lang: detectLang(),
     segments: REFERENCE_ORDER.map(id => ({ ...CATALOG_BY_ID[id] })),
     separator: DEFAULT_SEPARATOR,
     separators: Array.from({ length: MAX_LINES }, () => DEFAULT_SEPARATOR),
@@ -56,6 +58,7 @@ function load() {
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (!stored) return base;
+    if (LANGS.indexOf(stored.lang) === -1) stored.lang = base.lang;
     const separator = typeof stored.separator === 'string' ? stored.separator : base.separator;
     return {
       ...base,
@@ -74,8 +77,15 @@ let state = null;
 const listeners = new Set();
 
 export function getState() {
-  if (!state) state = load();
+  if (!state) {
+    state = load();
+    setLang(state.lang);
+  }
   return state;
+}
+
+export function setLanguage(value) {
+  patch({ lang: setLang(value) });
 }
 
 export function subscribe(fn) {

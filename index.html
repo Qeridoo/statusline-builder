@@ -65,6 +65,9 @@
 
 * { box-sizing: border-box; }
 
+/* Author display rules beat the UA stylesheet, so [hidden] needs saying twice. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--ground);
@@ -214,6 +217,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .panel__head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 11px 14px;
   border-bottom: 1px solid var(--line);
@@ -390,9 +394,10 @@ button, select, input, textarea { font: inherit; color: inherit; }
 
 /* ---------- export ---------- */
 
-.tabs { display: flex; gap: 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; }
 
 .tab {
+  white-space: nowrap;
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
@@ -565,7 +570,8 @@ button, select, input, textarea { font: inherit; color: inherit; }
   overflow: hidden;
 }
 
-.os {
+.os,
+.lang {
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -574,10 +580,12 @@ button, select, input, textarea { font: inherit; color: inherit; }
   cursor: pointer;
 }
 
-.os + .os { border-left: 1px solid var(--line); }
+.os + .os,
+.lang { border-left: 1px solid var(--line); }
 .os:hover { color: var(--ink); }
 
-.os[aria-pressed="true"] {
+.os[aria-pressed="true"],
+.lang[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
@@ -588,16 +596,74 @@ button, select, input, textarea { font: inherit; color: inherit; }
   padding-left: 10px;
   color: var(--ink-2);
 }
+
+/* ---------- tooltip ---------- */
+
+.tip {
+  position: fixed;
+  z-index: 60;
+  max-width: 268px;
+  padding: 9px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .28);
+  pointer-events: none;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.tip__title {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 3px;
+}
+
+.tip__body { color: var(--ink-2); }
+
+.tip__src {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.row__name { cursor: help; border-radius: 4px; }
+
+/* ---------- cheat sheet ---------- */
+
+.cheat { display: flex; flex-direction: column; gap: 10px; }
+
+.cheat__frame {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--term-bg);
+  padding: 8px;
+  overflow-x: auto;
+}
+
+.cheat__frame svg { display: block; max-width: 100%; height: auto; }
+
+.lang-switch .lang { font-size: 11px; letter-spacing: .04em; font-weight: 600; }
 </style>
 
 <header class="proof">
   <div class="proof__inner">
     <div class="proof__head">
       <h1 class="proof__title">Statusline Builder</h1>
-      <span class="proof__sub">Claude Code &middot; Payload-Schema 2.1.227</span>
+      <span class="proof__sub" data-i18n="app.subtitle">Claude Code · payload schema 2.1.227</span>
       <span class="proof__spacer"></span>
+      <div class="os-switch lang-switch" role="group" aria-label="Language">
+        <button class="lang" type="button" data-lang="en">EN</button>
+        <button class="lang" type="button" data-lang="de">DE</button>
+      </div>
       <label class="field">
-        <span>Zeilen</span>
+        <span data-i18n="field.lines">Lines</span>
         <select id="line-count">
           <option value="1">1</option>
           <option value="2">2</option>
@@ -606,17 +672,17 @@ button, select, input, textarea { font: inherit; color: inherit; }
       </label>
       <label class="field">
         <input type="checkbox" id="dim-separator" />
-        <span>Trenner gedimmt</span>
+        <span data-i18n="field.dim">Dim separator</span>
       </label>
     </div>
 
-    <div class="terminal" id="preview" aria-live="polite" aria-label="Vorschau der Statusline"></div>
+    <div class="terminal" id="preview" aria-live="polite" data-i18n-aria="preview.aria" aria-label="Status line preview"></div>
 
     <div class="toolbar">
       <div class="seps" id="separators"></div>
       <span class="proof__spacer"></span>
       <label class="slider">
-        <span>Kontext</span>
+        <span data-i18n="slider.context">Context</span>
         <input type="range" id="pv-ctx" min="0" max="100" step="1" />
         <output id="pv-ctx-out"></output>
       </label>
@@ -647,63 +713,73 @@ button, select, input, textarea { font: inherit; color: inherit; }
 <main class="shell">
   <section class="panel panel--catalog">
     <div class="panel__head">
-      <h2 class="panel__title">Segmente</h2>
+      <h2 class="panel__title" data-i18n="panel.segments">Segments</h2>
       <span class="panel__spacer"></span>
-      <button class="icon-btn" id="clear-all" type="button">alle aus</button>
+      <button class="icon-btn" id="clear-all" type="button" data-i18n="action.clearAll">clear all</button>
     </div>
     <div class="panel__body" id="catalog"></div>
   </section>
 
   <section class="panel panel--builder">
     <div class="panel__head">
-      <h2 class="panel__title">Reihenfolge &amp; Darstellung</h2>
+      <h2 class="panel__title" data-i18n="panel.builder">Order &amp; display</h2>
       <span class="panel__spacer"></span>
-      <button class="btn btn--small" id="add-block" type="button">+ Block</button>
+      <button class="btn btn--small" id="add-block" type="button" data-i18n="action.addBlock">+ Block</button>
       <label class="field">
-        <span>Sortierung</span>
+        <span data-i18n="field.sort">Sort</span>
         <select id="sort">
-          <option value="manual">manuell</option>
-          <option value="reference">Referenz-Layout</option>
-          <option value="group">nach Gruppe</option>
-          <option value="alpha">alphabetisch</option>
+          <option value="manual" data-i18n="sort.manual">manual</option>
+          <option value="reference" data-i18n="sort.reference">reference layout</option>
+          <option value="group" data-i18n="sort.group">by group</option>
+          <option value="alpha" data-i18n="sort.alpha">alphabetical</option>
         </select>
       </label>
     </div>
     <div class="panel__body">
       <div class="rows" id="rows"></div>
-      <p class="hint" id="builder-hint">Emoji und Label leer lassen heißt: wird nicht angezeigt. Ein Block ist freier Text, der immer erscheint — praktisch als Gruppentrenner.</p>
+      <p class="hint" id="builder-hint" data-i18n="builder.hint"></p>
     </div>
   </section>
 
   <section class="panel panel--export">
     <div class="panel__head">
-      <h2 class="panel__title">Übergabe</h2>
+      <h2 class="panel__title" data-i18n="panel.export">Handover</h2>
       <span class="panel__spacer"></span>
       <div class="tabs" role="tablist">
-        <button class="tab" type="button" role="tab" data-tab="script">statusline.js</button>
-        <button class="tab" type="button" role="tab" data-tab="prompt">Prompt</button>
-        <button class="tab" type="button" role="tab" data-tab="config">Config</button>
-        <button class="tab" type="button" role="tab" data-tab="load">Laden</button>
+        <button class="tab" type="button" role="tab" data-tab="script" data-i18n="tab.script">statusline.js</button>
+        <button class="tab" type="button" role="tab" data-tab="prompt" data-i18n="tab.prompt">Prompt</button>
+        <button class="tab" type="button" role="tab" data-tab="config" data-i18n="tab.config">Config</button>
+        <button class="tab" type="button" role="tab" data-tab="cheat" data-i18n="tab.cheat">Cheat sheet</button>
+        <button class="tab" type="button" role="tab" data-tab="load" data-i18n="tab.load">Load</button>
       </div>
     </div>
     <div class="panel__body">
       <div class="load-controls" id="load-controls" hidden>
-        <label class="btn" for="load-file">Datei wählen …</label>
+        <label class="btn" for="load-file" data-i18n="action.chooseFile">Choose file …</label>
         <input type="file" id="load-file" accept=".js,.json,.txt,application/json,text/javascript" />
         <span id="load-file-name" class="hint"></span>
       </div>
+      <div class="cheat" id="cheat-panel" hidden>
+        <div class="cheat__frame" id="cheat-preview"></div>
+        <div class="actions">
+          <button class="btn btn--primary" type="button" id="cheat-png" data-i18n="cheat.png">Download PNG</button>
+          <button class="btn" type="button" id="cheat-svg" data-i18n="cheat.svg">Download SVG</button>
+          <button class="btn" type="button" id="cheat-copy" data-i18n="cheat.copy">Copy SVG</button>
+        </div>
+      </div>
       <textarea class="code" id="export-out" spellcheck="false" aria-label="Export"></textarea>
       <div class="actions">
-        <button class="btn btn--primary" type="button" id="copy">Kopieren</button>
-        <button class="btn" type="button" id="download">Herunterladen</button>
-        <button class="btn btn--primary" type="button" id="import" hidden>Übernehmen</button>
+        <button class="btn btn--primary" type="button" id="copy" data-i18n="action.copy">Copy</button>
+        <button class="btn" type="button" id="download" data-i18n="action.download">Download</button>
+        <button class="btn btn--primary" type="button" id="import" hidden data-i18n="action.import">Apply</button>
       </div>
       <p class="hint" id="export-hint"></p>
+
       <div class="install">
         <div class="install__top">
-          <h3 class="panel__title">Installation</h3>
+          <h3 class="panel__title" data-i18n="install.title">Install</h3>
           <span class="panel__spacer"></span>
-          <div class="os-switch" role="group" aria-label="Betriebssystem">
+          <div class="os-switch" role="group" aria-label="Operating system">
             <button class="os" type="button" data-os="windows">Windows</button>
             <button class="os" type="button" data-os="macos">macOS</button>
             <button class="os" type="button" data-os="linux">Linux</button>
@@ -711,23 +787,23 @@ button, select, input, textarea { font: inherit; color: inherit; }
         </div>
 
         <label class="field control install__path">
-          <span>Zielpfad</span>
+          <span data-i18n="install.path">Target path</span>
           <input type="text" id="install-path" spellcheck="false" />
         </label>
 
-        <p class="hint"><b>1.</b> Skript in die Zwischenablage. Der Knopf nimmt immer den Inhalt von <code>statusline.js</code> — unabhängig davon, welcher Tab oben offen ist.</p>
-        <button class="btn btn--primary install__btn" type="button" id="copy-script">Skript kopieren</button>
+        <p class="hint" data-i18n-html="install.step1"></p>
+        <button class="btn btn--primary install__btn" type="button" id="copy-script" data-i18n="install.copyScript">Copy script</button>
 
-        <p class="hint"><b>2.</b> Zwischenablage in die Datei schreiben, in <span id="shell-name">PowerShell</span>:</p>
-        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="Befehl zum Speichern"></textarea>
-        <button class="btn btn--small install__btn" type="button" id="copy-command">Befehl kopieren</button>
+        <p class="hint"><span data-i18n-html="install.step2"></span> <span id="shell-name">PowerShell</span>:</p>
+        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="Command"></textarea>
+        <button class="btn btn--small install__btn" type="button" id="copy-command" data-i18n="install.copyCommand">Copy command</button>
 
-        <p class="hint"><b>3.</b> In <code>~/.claude/settings.json</code> eintragen:</p>
-        <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
-        <p class="hint hint--warn">Der Befehl muss mit <code>node</code> beginnen. Kommst du von einer <code>statusline.sh</code>, steht dort noch <code>bash</code> — dann läuft weiter das alte Skript und die Leiste bleibt leer. Die <code>.sh</code> selbst kann liegen bleiben.</p>
+        <p class="hint" data-i18n-html="install.step3"></p>
+        <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json snippet"></textarea>
+        <p class="hint hint--warn" data-i18n-html="install.warn"></p>
 
-        <p class="hint"><b>4.</b> Gegenprobe — die erste Zeile der Datei muss <code>#!/usr/bin/env node</code> sein. Steht dort <code>{</code>, wurde versehentlich der <b>Config</b>-Tab kopiert statt <b>statusline.js</b>:</p>
-        <textarea class="code code--line" id="verify-command" spellcheck="false" readonly aria-label="Befehl zum Prüfen"></textarea>
+        <p class="hint" data-i18n-html="install.step4"></p>
+        <textarea class="code code--line" id="verify-command" spellcheck="false" readonly aria-label="Verify command"></textarea>
       </div>
     </div>
   </section>
@@ -805,6 +881,326 @@ const SAMPLE_PAYLOAD = {
     "name": "main"
   }
 };
+
+// ---------- src/i18n.js ----------
+// Every user-facing string, in both languages. The catalogue keeps its own
+// per-segment explanations; everything else lives here.
+
+const LANGS = ['de', 'en'];
+const DEFAULT_LANG = 'en';
+
+function detectLang() {
+  try {
+    const tags = [navigator.language].concat(navigator.languages || []);
+    for (const tag of tags) {
+      if (typeof tag === 'string' && tag.toLowerCase().startsWith('de')) return 'de';
+    }
+  } catch {
+    // No navigator: fall through to the default.
+  }
+  return DEFAULT_LANG;
+}
+
+const STRINGS = {
+  de: {
+    'app.subtitle': 'Claude Code · Payload-Schema 2.1.227',
+    'field.lines': 'Zeilen',
+    'field.dim': 'Trenner gedimmt',
+    'field.separator': 'Trenner',
+    'field.separatorLine': 'Trenner Zeile {n}',
+    'field.sort': 'Sortierung',
+    'sort.manual': 'manuell',
+    'sort.reference': 'Referenz-Layout',
+    'sort.group': 'nach Gruppe',
+    'sort.alpha': 'alphabetisch',
+
+    'panel.segments': 'Segmente',
+    'panel.builder': 'Reihenfolge & Darstellung',
+    'panel.export': 'Übergabe',
+    'action.clearAll': 'alle aus',
+    'action.addBlock': '+ Block',
+    'builder.hint': 'Emoji und Label leer lassen heißt: wird nicht angezeigt. Ein Block ist freier Text, der immer erscheint — praktisch als Gruppentrenner.',
+    'builder.empty': 'Noch nichts ausgewählt — links Segmente antippen.',
+    'preview.empty': 'Kein Segment aktiv — links etwas auswählen.',
+    'preview.aria': 'Vorschau der Statusline',
+
+    'slider.context': 'Kontext',
+    'readout.today': 'heute übrig',
+    'readout.pace': 'Tempo',
+    'readout.burn': 'vs. Even-Burn',
+
+    'row.line': 'Zeile {n}',
+    'row.labelPlaceholder': 'Label',
+    'row.blockPlaceholder': 'Blocktext',
+    'row.up': 'nach oben',
+    'row.down': 'nach unten',
+    'row.remove': 'entfernen',
+    'row.emojiAria': 'Emoji für {id}',
+    'row.labelAria': 'Label für {id}',
+    'row.colorAria': 'Farbe für {id}',
+    'row.blockAria': 'Text des Blocks',
+
+    'fmt.basename': 'Ordnername',
+    'fmt.last2': 'Letzte 2 Ebenen',
+    'fmt.full': 'Voller Pfad',
+    'fmt.tilde': 'Home als ~',
+    'fmt.int': 'ganzzahlig',
+    'fmt.decimal1': '1 Nachkomma',
+    'fmt.short': 'gekürzt 95k',
+    'fmt.long': 'voll 95000',
+    'fmt.textFull': 'voll',
+    'fmt.max12': 'max 12',
+    'fmt.max24': 'max 24',
+    'fmt.first8': 'erste 8',
+    'fmt.onlyOn': 'nur wenn an',
+    'fmt.always': 'immer zeigen',
+    'fmt.arrowInt': '▼▲ ganzzahlig',
+    'fmt.arrowDecimal': '▼▲ 1 Nachkomma',
+    'fmt.cats': 'Katzen',
+    'fmt.traffic': 'Ampel',
+    'fmt.weather': 'Wetter',
+    'fmt.battery': 'Akku',
+    'fmt.countdown': 'Restzeit',
+    'fmt.duration': 'Dauer',
+    'fmt.currency': 'USD',
+    'fmt.count': 'Anzahl',
+    'fmt.raw': 'unverändert',
+
+    'color.default': 'Standard',
+    'color.usage': 'Ampel grün→rot',
+    'color.inverse': 'Ampel invers',
+    'color.static': 'Einfarbig',
+    'color.gradient': 'Verlauf',
+
+    'group.session': 'Session',
+    'group.model': 'Modell',
+    'group.workspace': 'Workspace',
+    'group.context': 'Kontext',
+    'group.limits': 'Limits',
+    'group.cost': 'Kosten',
+    'group.derived': 'Abgeleitet',
+    'group.status': 'Status',
+    'group.block': 'Block',
+
+    'tab.script': 'statusline.js',
+    'tab.prompt': 'Prompt',
+    'tab.config': 'Config',
+    'tab.cheat': 'Cheatsheet',
+    'tab.load': 'Laden',
+
+    'hint.script': 'Das ist die Datei, die installiert wird. Unten Schritt für Schritt.',
+    'hint.prompt': 'An Claude geben — enthält Segmentliste, Regeln und die fertige Config.',
+    'hint.config': 'Nur eine Sicherung der Einstellungen — NICHT die Datei, die installiert wird. Zum Zurückladen den Tab „Laden" nehmen.',
+    'hint.cheat': 'Deine Zeile mit Erklärung zu jedem Segment, als Bild zum Aufheben oder Teilen.',
+    'hint.load': 'Bestehendes statusline.js oder eine Config einfügen bzw. Datei wählen, dann Übernehmen.',
+
+    'action.copy': 'Kopieren',
+    'action.download': 'Herunterladen',
+    'action.import': 'Übernehmen',
+    'action.chooseFile': 'Datei wählen …',
+    'action.copied': 'Kopiert',
+    'action.copyFailed': 'Bitte manuell kopieren',
+    'action.rendering': 'rendere …',
+
+    'cheat.png': 'PNG herunterladen',
+    'cheat.svg': 'SVG herunterladen',
+    'cheat.copy': 'SVG kopieren',
+    'cheat.title': 'Claude Code Statusline',
+
+    'load.placeholder': 'Hier ein erzeugtes statusline.js einfügen (der CFG-Block wird ausgelesen) oder eine Config-JSON.\nAlternativ oben eine Datei wählen — z. B. ~/.claude/statusline.js',
+    'load.fileRead': 'Datei gelesen. Jetzt „Übernehmen" drücken.',
+    'load.fileFailed': 'Datei konnte nicht gelesen werden.',
+    'load.done': 'Übernommen — {segments} Segmente, {lines} Zeile(n).',
+    'download.sandboxed': 'Kommt kein Download an, blockiert ihn die Sandbox. Nimm die vier Schritte unten — die brauchen keinen Download.',
+    'cheat.pngFailed': '{message} SVG herunterladen funktioniert als Ausweichweg.',
+
+    'install.title': 'Installation',
+    'install.path': 'Zielpfad',
+    'install.step1': '<b>1.</b> Skript in die Zwischenablage. Der Knopf nimmt immer den Inhalt von <code>statusline.js</code> — unabhängig davon, welcher Tab oben offen ist.',
+    'install.copyScript': 'Skript kopieren',
+    'install.step2': '<b>2.</b> Zwischenablage in die Datei schreiben, in',
+    'install.copyCommand': 'Befehl kopieren',
+    'install.step3': '<b>3.</b> In <code>~/.claude/settings.json</code> eintragen:',
+    'install.warn': 'Der Befehl muss mit <code>node</code> beginnen. Kommst du von einer <code>statusline.sh</code>, steht dort noch <code>bash</code> — dann läuft weiter das alte Skript und die Leiste bleibt leer. Die <code>.sh</code> selbst kann liegen bleiben.',
+    'install.step4': '<b>4.</b> Gegenprobe — die erste Zeile der Datei muss <code>#!/usr/bin/env node</code> sein. Steht dort <code>{</code>, wurde versehentlich der <b>Config</b>-Tab kopiert statt <b>statusline.js</b>:',
+
+    'tip.literal': 'fester Text, wird immer gedruckt',
+    'tip.derived': 'berechnet · {fn}',
+
+    'err.empty': 'Nichts zum Einlesen — bitte Datei wählen oder Text einfügen.',
+    'err.notObject': 'Config muss ein Objekt sein.',
+    'err.noSegments': 'Config braucht ein segments-Array.',
+    'err.segmentShape': 'Segment {index} ist kein Objekt.',
+    'err.noSource': 'Segment {id} hat keine bekannte Quelle.',
+    'err.bash': 'Das sieht nach einer Bash-Statusline aus. Die lässt sich nicht automatisch übernehmen — bau die Segmente einmal links zusammen, danach kannst du das erzeugte statusline.js immer wieder laden.',
+    'err.noCfg': 'Weder eine Config noch ein erzeugtes statusline.js — kein CFG-Block gefunden.',
+    'err.pngRender': 'Das SVG ließ sich nicht rendern.',
+    'err.pngBlob': 'PNG konnte nicht erzeugt werden.'
+  },
+
+  en: {
+    'app.subtitle': 'Claude Code · payload schema 2.1.227',
+    'field.lines': 'Lines',
+    'field.dim': 'Dim separator',
+    'field.separator': 'Separator',
+    'field.separatorLine': 'Separator line {n}',
+    'field.sort': 'Sort',
+    'sort.manual': 'manual',
+    'sort.reference': 'reference layout',
+    'sort.group': 'by group',
+    'sort.alpha': 'alphabetical',
+
+    'panel.segments': 'Segments',
+    'panel.builder': 'Order & display',
+    'panel.export': 'Handover',
+    'action.clearAll': 'clear all',
+    'action.addBlock': '+ Block',
+    'builder.hint': 'An empty emoji or label field means that part is not printed. A block is free text that always appears — handy as a group divider.',
+    'builder.empty': 'Nothing picked yet — tap segments on the left.',
+    'preview.empty': 'No segment active — pick one on the left.',
+    'preview.aria': 'Status line preview',
+
+    'slider.context': 'Context',
+    'readout.today': 'today left',
+    'readout.pace': 'pace',
+    'readout.burn': 'vs even burn',
+
+    'row.line': 'Line {n}',
+    'row.labelPlaceholder': 'Label',
+    'row.blockPlaceholder': 'Block text',
+    'row.up': 'move up',
+    'row.down': 'move down',
+    'row.remove': 'remove',
+    'row.emojiAria': 'Emoji for {id}',
+    'row.labelAria': 'Label for {id}',
+    'row.colorAria': 'Colour for {id}',
+    'row.blockAria': 'Block text',
+
+    'fmt.basename': 'Folder name',
+    'fmt.last2': 'Last 2 levels',
+    'fmt.full': 'Full path',
+    'fmt.tilde': 'Home as ~',
+    'fmt.int': 'whole number',
+    'fmt.decimal1': '1 decimal',
+    'fmt.short': 'short 95k',
+    'fmt.long': 'full 95000',
+    'fmt.textFull': 'full',
+    'fmt.max12': 'max 12',
+    'fmt.max24': 'max 24',
+    'fmt.first8': 'first 8',
+    'fmt.onlyOn': 'only when on',
+    'fmt.always': 'always show',
+    'fmt.arrowInt': '▼▲ whole number',
+    'fmt.arrowDecimal': '▼▲ 1 decimal',
+    'fmt.cats': 'Cats',
+    'fmt.traffic': 'Traffic light',
+    'fmt.weather': 'Weather',
+    'fmt.battery': 'Battery',
+    'fmt.countdown': 'Time left',
+    'fmt.duration': 'Duration',
+    'fmt.currency': 'USD',
+    'fmt.count': 'Count',
+    'fmt.raw': 'unchanged',
+
+    'color.default': 'Default',
+    'color.usage': 'Meter green→red',
+    'color.inverse': 'Meter inverted',
+    'color.static': 'Single colour',
+    'color.gradient': 'Gradient',
+
+    'group.session': 'Session',
+    'group.model': 'Model',
+    'group.workspace': 'Workspace',
+    'group.context': 'Context',
+    'group.limits': 'Limits',
+    'group.cost': 'Cost',
+    'group.derived': 'Derived',
+    'group.status': 'Status',
+    'group.block': 'Block',
+
+    'tab.script': 'statusline.js',
+    'tab.prompt': 'Prompt',
+    'tab.config': 'Config',
+    'tab.cheat': 'Cheat sheet',
+    'tab.load': 'Load',
+
+    'hint.script': 'This is the file that gets installed. Step by step below.',
+    'hint.prompt': 'Hand this to Claude — it carries the segment list, the rules and the finished config.',
+    'hint.config': 'A backup of the settings only — NOT the file that gets installed. Use the “Load” tab to read it back.',
+    'hint.cheat': 'Your line with an explanation for every segment, as an image to keep or share.',
+    'hint.load': 'Paste an existing statusline.js or a config, or choose a file, then apply.',
+
+    'action.copy': 'Copy',
+    'action.download': 'Download',
+    'action.import': 'Apply',
+    'action.chooseFile': 'Choose file …',
+    'action.copied': 'Copied',
+    'action.copyFailed': 'Please copy manually',
+    'action.rendering': 'rendering …',
+
+    'cheat.png': 'Download PNG',
+    'cheat.svg': 'Download SVG',
+    'cheat.copy': 'Copy SVG',
+    'cheat.title': 'Claude Code status line',
+
+    'load.placeholder': 'Paste a generated statusline.js here (its CFG block is read out) or a config JSON.\nOr choose a file above — e.g. ~/.claude/statusline.js',
+    'load.fileRead': 'File read. Now press “Apply”.',
+    'load.fileFailed': 'The file could not be read.',
+    'load.done': 'Applied — {segments} segments, {lines} line(s).',
+    'download.sandboxed': 'If no download arrives, the sandbox is blocking it. Use the four steps below — they need no download.',
+    'cheat.pngFailed': '{message} Downloading the SVG works as a fallback.',
+
+    'install.title': 'Install',
+    'install.path': 'Target path',
+    'install.step1': '<b>1.</b> Put the script on the clipboard. This button always takes the contents of <code>statusline.js</code>, whichever tab is open above.',
+    'install.copyScript': 'Copy script',
+    'install.step2': '<b>2.</b> Write the clipboard into the file, in',
+    'install.copyCommand': 'Copy command',
+    'install.step3': '<b>3.</b> Add this to <code>~/.claude/settings.json</code>:',
+    'install.warn': 'The command has to start with <code>node</code>. Coming from a <code>statusline.sh</code>, it still says <code>bash</code> — then the old script keeps running and the line stays blank. The <code>.sh</code> itself can stay where it is.',
+    'install.step4': '<b>4.</b> Check it — the first line of the file must be <code>#!/usr/bin/env node</code>. A leading <code>{</code> means the <b>Config</b> tab was copied instead of <b>statusline.js</b>:',
+
+    'tip.literal': 'fixed text, always printed',
+    'tip.derived': 'computed · {fn}',
+
+    'err.empty': 'Nothing to read — choose a file or paste some text.',
+    'err.notObject': 'The config has to be an object.',
+    'err.noSegments': 'The config needs a segments array.',
+    'err.segmentShape': 'Segment {index} is not an object.',
+    'err.noSource': 'Segment {id} has no known source.',
+    'err.bash': 'That looks like a bash status line. It cannot be imported automatically — assemble the segments once on the left, after which the generated statusline.js can be loaded again any time.',
+    'err.noCfg': 'Neither a config nor a generated statusline.js — no CFG block found.',
+    'err.pngRender': 'The SVG could not be rendered.',
+    'err.pngBlob': 'The PNG could not be created.'
+  }
+};
+
+function t(lang, key, vars) {
+  const table = STRINGS[lang] || STRINGS[DEFAULT_LANG];
+  let text = table[key];
+  if (text === undefined) text = STRINGS[DEFAULT_LANG][key];
+  if (text === undefined) return key;
+  if (!vars) return text;
+  return String(text).replace(/\{(\w+)\}/g, (match, name) =>
+    (vars[name] === undefined ? match : String(vars[name])));
+}
+
+// A module-level current language, so pure helpers deep in the call tree do not
+// each need it threaded through their signature. The state module owns it.
+let current = DEFAULT_LANG;
+
+function setLang(value) {
+  current = LANGS.indexOf(value) === -1 ? DEFAULT_LANG : value;
+  return current;
+}
+
+function lang() {
+  return current;
+}
+
+function tt(key, vars) {
+  return t(current, key, vars);
+}
 
 // ---------- src/format.js ----------
 // Value formatters shared by the builder preview and the generated status line.
@@ -1264,6 +1660,128 @@ const CATALOG = [
   seg('agent_type', 'status', 'type', '🧩', path('agent_type'), { type: 'text' }, MUTED, { hideValues: ['main'] })
 ];
 
+// One sentence per segment, saying what the number means rather than where it
+// comes from. Shown as a tooltip in the builder and as the caption on the
+// cheatsheet, so it has to stay short enough to wrap into two narrow lines.
+const HELP = {
+  session_name: 'Name der Session, wie mit /rename vergeben. Ohne Namen bleibt das Segment leer.',
+  session_id: 'Die ersten 8 Zeichen der Session-UUID — nützlich, um Transcripts wiederzufinden.',
+  permission_mode: 'Aktueller Berechtigungsmodus. Wird ausgeblendet, solange er auf default steht.',
+  output_style: 'Gewählter Output-Style. Wird ausgeblendet, solange er auf default steht.',
+  remote: 'Kennung der Remote-Session, wenn die Arbeit in der Cloud läuft.',
+
+  model: 'Das Modell, das gerade antwortet.',
+  model_id: 'Die vollständige Modell-ID inklusive Varianten-Suffix wie [1m].',
+  effort: 'Reasoning-Effort von low bis max. Höher heißt gründlicher und langsamer.',
+  fast_mode: 'Zeigt an, dass Fast Mode aktiv ist — gleiches Modell, schnellere Ausgabe.',
+  thinking: 'Zeigt an, dass erweitertes Nachdenken eingeschaltet ist.',
+  version: 'Version von Claude Code.',
+
+  project_dir: 'Das Projektverzeichnis, in dem die Session gestartet wurde.',
+  current_dir: 'Das Verzeichnis, in dem gerade gearbeitet wird — kann vom Projekt abweichen.',
+  git_worktree: 'Der ausgecheckte Git-Branch des Arbeitsverzeichnisses.',
+  repo: 'Name des Git-Repositories.',
+  worktree_name: 'Name des isolierten Worktrees, wenn mit --worktree gearbeitet wird.',
+  worktree_branch: 'Branch innerhalb des isolierten Worktrees.',
+  added_dirs: 'Anzahl zusätzlich freigegebener Verzeichnisse außerhalb des Projekts.',
+  pr: 'Nummer des Pull Requests, an dem diese Session hängt.',
+
+  ctx_used: 'Wie voll das Kontextfenster dieses Chats ist. Setzt sich mit /clear zurück.',
+  ctx_remaining: 'Wie viel vom Kontextfenster noch frei ist — Gegenstück zu ctx.',
+  ctx_left_tokens: 'Verbleibender Kontext in Tokens statt in Prozent.',
+  ctx_window_size: 'Gesamtgröße des Kontextfensters dieses Modells.',
+  tokens_in: 'Summe aller Eingabe-Tokens dieser Session, inklusive Cache.',
+  tokens_out: 'Summe aller Ausgabe-Tokens dieser Session.',
+  tokens_cache_read: 'Aus dem Prompt-Cache gelesene Tokens — die sind deutlich billiger.',
+  exceeds_200k: 'Meldet, dass die Session über 200k Tokens hinaus ist.',
+
+  limit_5h: 'Verbrauch im laufenden 5-Stunden-Fenster. Kommt vom Server, wie /usage.',
+  limit_5h_reset: 'Countdown bis das 5-Stunden-Fenster zurückgesetzt wird.',
+  limit_7d: 'Verbrauch im laufenden Wochenfenster. Kommt vom Server, wie /usage.',
+  limit_7d_reset: 'Countdown bis das Wochenfenster zurückgesetzt wird.',
+
+  cost_usd: 'Bisherige Kosten dieser Session in US-Dollar.',
+  duration: 'Wanduhr-Zeit seit Beginn der Session.',
+  api_duration: 'Reine API-Zeit — der Anteil, in dem tatsächlich gerechnet wurde.',
+  lines_added: 'In dieser Session hinzugefügte Codezeilen.',
+  lines_removed: 'In dieser Session entfernte Codezeilen.',
+  lines_delta: 'Hinzugefügte und entfernte Zeilen dieser Session in einem Segment.',
+
+  weekly_today_left: 'Wie viel vom heutigen Anteil am Wochenlimit noch übrig ist. 0 heißt: für heute aufgebraucht, negativ heißt: du greifst auf morgen vor.',
+  weekly_pace: 'Wie viel Prozent pro Tag du ab jetzt verbrauchen darfst, um das Wochenlimit gerade zu erreichen.',
+  weekly_even_burn: 'Abstand zur gleichmäßigen Verbrauchslinie. ▼ heißt unter Plan, ▲ heißt du bist vor dem Reset am Limit.',
+  mood: 'Fasst den schlechtesten der drei Messwerte — Kontext, 5h, 7d — in einem Emoji zusammen.',
+
+  vim_mode: 'Aktueller Vim-Modus, wenn die Vim-Eingabe eingeschaltet ist.',
+  agent_name: 'Name des Subagenten, der diese Zeile rendert.',
+  agent_type: 'Typ des Agenten. Wird ausgeblendet, solange es der Hauptagent ist.'
+};
+
+const HELP_EN = {
+  session_name: 'Name of the session, as set with /rename. Without one the segment stays empty.',
+  session_id: 'The first 8 characters of the session UUID — handy for finding transcripts.',
+  permission_mode: 'The current permission mode. Hidden while it sits at default.',
+  output_style: 'The chosen output style. Hidden while it sits at default.',
+  remote: 'Identifier of the remote session when the work runs in the cloud.',
+
+  model: 'The model that is answering right now.',
+  model_id: 'The full model id including variant suffixes such as [1m].',
+  effort: 'Reasoning effort from low to max. Higher means more thorough and slower.',
+  fast_mode: 'Shows that fast mode is on — same model, faster output.',
+  thinking: 'Shows that extended thinking is switched on.',
+  version: 'The version of Claude Code.',
+
+  project_dir: 'The project directory the session was started in.',
+  current_dir: 'The directory being worked in, which can differ from the project.',
+  git_worktree: 'The git branch checked out in the working directory.',
+  repo: 'Name of the git repository.',
+  worktree_name: 'Name of the isolated worktree when running with --worktree.',
+  worktree_branch: 'Branch inside the isolated worktree.',
+  added_dirs: 'How many extra directories outside the project were made available.',
+  pr: 'Number of the pull request this session is attached to.',
+
+  ctx_used: 'How full this chat’s context window is. Resets with /clear.',
+  ctx_remaining: 'How much of the context window is still free — the counterpart to ctx.',
+  ctx_left_tokens: 'Remaining context in tokens rather than per cent.',
+  ctx_window_size: 'Total size of this model’s context window.',
+  tokens_in: 'All input tokens of this session, cache included.',
+  tokens_out: 'All output tokens of this session.',
+  tokens_cache_read: 'Tokens served from the prompt cache — those are far cheaper.',
+  exceeds_200k: 'Flags that the session has passed 200k tokens.',
+
+  limit_5h: 'Usage inside the running 5-hour window. Server-side, same as /usage.',
+  limit_5h_reset: 'Countdown until the 5-hour window resets.',
+  limit_7d: 'Usage inside the running weekly window. Server-side, same as /usage.',
+  limit_7d_reset: 'Countdown until the weekly window resets.',
+
+  cost_usd: 'What this session has cost so far, in US dollars.',
+  duration: 'Wall-clock time since the session started.',
+  api_duration: 'API time only — the share actually spent computing.',
+  lines_added: 'Lines of code added in this session.',
+  lines_removed: 'Lines of code removed in this session.',
+  lines_delta: 'Lines added and removed in this session, in one segment.',
+
+  weekly_today_left: 'How much of today’s share of the weekly limit is left. 0 means done for today, negative means you are eating into tomorrow.',
+  weekly_pace: 'How many per cent per day you may spend from now on to just reach the weekly limit.',
+  weekly_even_burn: 'Distance from an even burn line. ▼ means under plan, ▲ means you will cap before the reset.',
+  mood: 'Folds the worst of the three meters — context, 5h, 7d — into a single emoji.',
+
+  vim_mode: 'The current vim mode when vim input is switched on.',
+  agent_name: 'Name of the subagent rendering this line.',
+  agent_type: 'Type of agent. Hidden while it is the main one.'
+};
+
+for (const segment of CATALOG) {
+  segment.help = { de: HELP[segment.id] || '', en: HELP_EN[segment.id] || '' };
+}
+
+function helpText(segment, lang) {
+  const help = segment && segment.help;
+  if (!help) return '';
+  if (typeof help === 'string') return help;
+  return help[lang] || help.en || help.de || '';
+}
+
 const CATALOG_BY_ID = CATALOG.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
 
 // Free-text blocks. They are not part of the catalogue — the user creates them —
@@ -1388,6 +1906,235 @@ function renderHtml(config, payload, now) {
     })
     .join('<br>');
 }
+
+// ---------- src/cheatsheet.js ----------
+// Builds the annotated cheat sheet: the rendered status line with a labelled
+// callout per segment, as a standalone SVG.
+//
+// Text measurement is injected rather than done here, so the layout is a pure
+// function the tests can drive with a predictable monospace model while the
+// browser passes a real canvas measurer.
+
+
+const REPO_URL = 'github.com/Qeridoo/statusline-builder';
+
+const XML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' };
+const escapeXml = s => String(s).replace(/[&<>"']/g, c => XML_ESCAPES[c]);
+
+const THEME = {
+  bg: '#14131a',
+  panel: '#1b1a23',
+  ink: '#e7e4f0',
+  muted: '#8b869c',
+  faint: '#3a3747',
+  accent: '#a882ff',
+  separator: '#5d5a71'
+};
+
+const LAYOUT = {
+  pad: 44,
+  titleSize: 19,
+  lineSize: 17,
+  calloutTitleSize: 9.5,
+  calloutBodySize: 9.5,
+  calloutLineHeight: 12,
+  rowGap: 14,
+  leader: 16,
+  labelWrap: 30,
+  minGap: 16
+};
+
+function wrapText(text, maxChars) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    if (!line) line = word;
+    else if ((line + ' ' + word).length <= maxChars) line += ' ' + word;
+    else { lines.push(line); line = word; }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// Alternates callouts above and below the line, then packs each side into as
+// few rows as fit without two labels overlapping.
+function assignSlots(callouts, minGap = LAYOUT.minGap) {
+  const ordered = callouts.slice().sort((a, b) => a.anchor - b.anchor);
+  const sides = { top: [], bottom: [] };
+  ordered.forEach((callout, index) => {
+    callout.side = index % 2 === 0 ? 'top' : 'bottom';
+    sides[callout.side].push(callout);
+  });
+
+  for (const side of ['top', 'bottom']) {
+    const rightmost = [];
+    for (const callout of sides[side]) {
+      const left = callout.anchor - callout.width / 2;
+      let row = 0;
+      while (rightmost[row] !== undefined && rightmost[row] + minGap > left) row += 1;
+      rightmost[row] = left + callout.width;
+      callout.row = row;
+      callout.left = left;
+    }
+  }
+
+  return {
+    callouts: ordered,
+    topRows: sides.top.reduce((max, c) => Math.max(max, c.row + 1), 0),
+    bottomRows: sides.bottom.reduce((max, c) => Math.max(max, c.row + 1), 0)
+  };
+}
+
+// Everything positional, separated from the markup so the geometry can be
+// asserted directly — in particular that no callout runs off the canvas.
+// measure(text, fontSize, family) -> width in px. family is 'mono' or 'sans'.
+function cheatsheetGeometry(config, payload, measure, opts = {}) {
+  const now = opts.now === undefined ? Date.now() : opts.now;
+  const lines = buildLines(config, payload, now);
+
+  const mono = text => measure(text, LAYOUT.lineSize, 'mono');
+  const sansTitle = text => measure(text, LAYOUT.calloutTitleSize, 'sans');
+  const sansBody = text => measure(text, LAYOUT.calloutBodySize, 'sans');
+
+  // Lay out every status line row, remembering where each segment sits.
+  const rendered = lines.map(entry => {
+    const separator = separatorOf(config, entry.line);
+    const separatorWidth = mono(separator);
+    const parts = [];
+    let x = 0;
+    entry.parts.forEach((part, index) => {
+      if (index > 0) {
+        parts.push({ text: separator, x, width: separatorWidth, hex: THEME.separator, isSeparator: true });
+        x += separatorWidth;
+      }
+      const width = mono(part.text);
+      parts.push({ text: part.text, x, width, hex: part.hex || THEME.ink, segment: part.segment });
+      x += width;
+    });
+    return { parts, width: x };
+  });
+
+  const lineWidth = rendered.reduce((max, row) => Math.max(max, row.width), 0);
+
+  // Only the first row gets callouts; a second status line would double the
+  // height for little gain, and its segments are listed in the legend anyway.
+  const primary = rendered[0] || { parts: [], width: 0 };
+  const callouts = primary.parts
+    .filter(part => part.segment && helpText(part.segment, lang()))
+    .map(part => {
+      const label = String(part.segment.label || part.segment.id).toUpperCase();
+      const body = wrapText(helpText(part.segment, lang()), LAYOUT.labelWrap);
+      const width = Math.max(sansTitle(label), ...body.map(sansBody), 40);
+      return { label, body, width, anchor: part.x + part.width / 2, hex: part.hex };
+    });
+
+  const slots = assignSlots(callouts);
+  const bodyLines = Math.max(1, ...callouts.map(c => c.body.length));
+  const blockHeight = LAYOUT.calloutLineHeight * (bodyLines + 1) + LAYOUT.rowGap;
+
+  const topBlock = slots.topRows * blockHeight;
+  const bottomBlock = slots.bottomRows * blockHeight;
+  const headerH = LAYOUT.titleSize + 26;
+  const statusRowHeight = LAYOUT.lineSize * 1.75;
+  const statusH = rendered.length * statusRowHeight;
+  const footerH = 30;
+
+  // A callout is centred on its segment, so the outermost ones stick out past
+  // the status line itself. The canvas has to cover them, not just the line.
+  const contentLeft = Math.min(0, ...callouts.map(c => c.anchor - c.width / 2));
+  const contentRight = Math.max(lineWidth, ...callouts.map(c => c.anchor + c.width / 2));
+  const contentWidth = contentRight - contentLeft;
+
+  const width = Math.round(Math.max(940, contentWidth + LAYOUT.pad * 2));
+  const height = Math.round(LAYOUT.pad + headerH + topBlock + LAYOUT.leader + statusH +
+    LAYOUT.leader + bottomBlock + footerH + LAYOUT.pad);
+
+  const originX = Math.round((width - contentWidth) / 2 - contentLeft);
+  const firstBaseline = LAYOUT.pad + headerH + topBlock + LAYOUT.leader + LAYOUT.lineSize;
+
+  return {
+    rendered, callouts: slots.callouts, width, height, originX, firstBaseline,
+    blockHeight, topBlock, headerH, statusRowHeight, bodyLines,
+    topRows: slots.topRows, bottomRows: slots.bottomRows
+  };
+}
+
+function buildCheatsheetSvg(config, payload, measure, opts = {}) {
+  const title = opts.title || tt('cheat.title');
+  const repo = opts.repo || REPO_URL;
+  const {
+    rendered, callouts, width, height, originX, firstBaseline,
+    blockHeight, topBlock, headerH, statusRowHeight
+  } = cheatsheetGeometry(config, payload, measure, opts);
+
+  const out = [];
+  out.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height +
+    '" viewBox="0 0 ' + width + ' ' + height + '" font-family="ui-sans-serif, Segoe UI, Helvetica, Arial, sans-serif">');
+  out.push('<rect width="100%" height="100%" fill="' + THEME.bg + '"/>');
+  out.push('<rect x="16" y="16" width="' + (width - 32) + '" height="' + (height - 32) +
+    '" rx="14" fill="' + THEME.panel + '" stroke="' + THEME.faint + '"/>');
+
+  out.push('<text x="' + LAYOUT.pad + '" y="' + (LAYOUT.pad + LAYOUT.titleSize) + '" font-size="' + LAYOUT.titleSize +
+    '" font-weight="600" fill="' + THEME.ink + '">' + escapeXml(title) + '</text>');
+
+  // Status line rows.
+  rendered.forEach((row, index) => {
+    const baseline = firstBaseline + index * statusRowHeight;
+    out.push('<g font-family="ui-monospace, Cascadia Code, Consolas, monospace" font-size="' + LAYOUT.lineSize + '">');
+    for (const part of row.parts) {
+      out.push('<text x="' + round(originX + part.x) + '" y="' + round(baseline) + '" fill="' + part.hex +
+        '" xml:space="preserve">' + escapeXml(part.text) + '</text>');
+    }
+    out.push('</g>');
+  });
+
+  // Callouts.
+  const lastBaseline = firstBaseline + (rendered.length - 1) * statusRowHeight;
+  for (const callout of callouts) {
+    const anchorX = round(originX + callout.anchor);
+    const isTop = callout.side === 'top';
+    const rowOffset = callout.row * blockHeight;
+
+    const labelBottom = isTop
+      ? LAYOUT.pad + headerH + topBlock - rowOffset - LAYOUT.rowGap
+      : lastBaseline + LAYOUT.leader + rowOffset + LAYOUT.calloutLineHeight;
+
+    const leaderFrom = isTop
+      ? labelBottom + 4
+      : lastBaseline + 6;
+    const leaderTo = isTop
+      ? firstBaseline - LAYOUT.lineSize - 4
+      : labelBottom - LAYOUT.calloutLineHeight - 4;
+
+    out.push('<line x1="' + anchorX + '" y1="' + round(leaderFrom) + '" x2="' + anchorX + '" y2="' +
+      round(leaderTo) + '" stroke="' + THEME.faint + '" stroke-width="1"/>');
+
+    const titleY = isTop ? labelBottom - LAYOUT.calloutLineHeight * callout.body.length : labelBottom;
+    out.push('<text x="' + anchorX + '" y="' + round(titleY) + '" text-anchor="middle" font-size="' +
+      LAYOUT.calloutTitleSize + '" font-weight="700" letter-spacing="0.9" fill="' + (callout.hex || THEME.ink) +
+      '">' + escapeXml(callout.label) + '</text>');
+
+    callout.body.forEach((text, index) => {
+      const y = titleY + LAYOUT.calloutLineHeight * (index + 1);
+      out.push('<text x="' + anchorX + '" y="' + round(y) + '" text-anchor="middle" font-size="' +
+        LAYOUT.calloutBodySize + '" fill="' + THEME.muted + '">' + escapeXml(text) + '</text>');
+    });
+  }
+
+  out.push('<text x="' + LAYOUT.pad + '" y="' + round(height - LAYOUT.pad) + '" font-size="11" fill="' + THEME.muted +
+    '" font-family="ui-monospace, Cascadia Code, Consolas, monospace">' + escapeXml(repo) + '</text>');
+  out.push('</svg>');
+  return out.join('\n');
+}
+
+function separatorOf(config, index) {
+  const perLine = config.separators;
+  if (Array.isArray(perLine) && typeof perLine[index] === 'string') return perLine[index];
+  return config.separator === undefined ? ' | ' : config.separator;
+}
+
+const round = n => Math.round(n * 10) / 10;
 
 // ---------- src/runtime.js ----------
 // The engine that ships inside the generated statusline.js.
@@ -1824,18 +2571,18 @@ function generateConfigJson(config) {
 
 function parseConfigJson(text) {
   const parsed = typeof text === 'string' ? JSON.parse(text) : text;
-  if (!parsed || typeof parsed !== 'object') throw new Error('Config muss ein Objekt sein.');
-  if (!Array.isArray(parsed.segments)) throw new Error('Config braucht ein segments-Array.');
+  if (!parsed || typeof parsed !== 'object') throw new Error(tt('err.notObject'));
+  if (!Array.isArray(parsed.segments)) throw new Error(tt('err.noSegments'));
 
   const segments = parsed.segments.map((segment, index) => {
     if (!segment || typeof segment !== 'object') {
-      throw new Error('Segment ' + index + ' ist kein Objekt.');
+      throw new Error(tt('err.segmentShape', { index }));
     }
     // Fall back to the catalogue entry so an abbreviated config still works.
     // Blocks are user-made and have no catalogue entry, so they carry themselves.
     const base = isBlock(segment) ? {} : (CATALOG_BY_ID[segment.id] || {});
     if (!segment.source && !base.source) {
-      throw new Error('Segment ' + (segment.id || index) + ' hat keine bekannte Quelle.');
+      throw new Error(tt('err.noSource', { id: segment.id || index }));
     }
     return { ...base, ...segment };
   });
@@ -1877,7 +2624,7 @@ function extractCfgLiteral(text) {
 // Accepts a config JSON or a generated statusline.js and returns a config.
 function parseAnyConfig(text) {
   const trimmed = String(text || '').trim();
-  if (!trimmed) throw new Error('Nichts zum Einlesen — bitte Datei wählen oder Text einfügen.');
+  if (!trimmed) throw new Error(tt('err.empty'));
 
   if (trimmed.startsWith('{')) return parseConfigJson(trimmed);
 
@@ -1885,22 +2632,99 @@ function parseAnyConfig(text) {
   if (literal) return parseConfigJson(literal);
 
   if (/\bjq\b/.test(trimmed) || /^#!.*\b(bash|sh)\b/m.test(trimmed)) {
-    throw new Error(
-      'Das sieht nach einer Bash-Statusline aus. Die lässt sich nicht automatisch übernehmen — ' +
-      'bau die Segmente einmal links zusammen, danach kannst du das erzeugte statusline.js immer wieder laden.'
-    );
+    throw new Error(tt('err.bash'));
   }
-  throw new Error('Weder eine Config noch ein erzeugtes statusline.js — kein CFG-Block gefunden.');
+  throw new Error(tt('err.noCfg'));
 }
 
-function describeColor(color) {
-  if (!color) return 'keine Farbe';
-  if (color.mode === 'static') return 'fest ' + color.value;
+const PROMPT_TEXT = {
+  de: {
+    intro: 'Bitte richte meine Claude Code Statusline ein.',
+    goalHead: '## Ziel',
+    goal: path => [
+      'Ein Node-Skript unter `' + path + '`, das den Statusline-JSON-Payload von stdin liest',
+      'und die unten beschriebene Zeile ausgibt. Kein `jq`, keine Dependencies — nur Node.',
+      'Danach `~/.claude/settings.json` eintragen:'
+    ],
+    layoutHead: '## Aufbau',
+    lineCount: n => '- Zeilen: ' + n + ', jede mit eigenem Trenner (siehe unten)',
+    order: '- Segmente in genau dieser Reihenfolge:',
+    line: n => 'Zeile ' + n,
+    separator: 'Trenner',
+    dimmed: '(gedimmt)',
+    format: 'Format',
+    colour: 'Farbe',
+    emoji: 'Emoji',
+    label: 'Label',
+    noColour: 'keine Farbe',
+    fixed: 'fest',
+    thresholds: 'Schwellen',
+    gradient: 'Verlauf',
+    over: 'über',
+    literal: v => 'fester Text `' + v + '`',
+    derived: fn => 'abgeleitet über `' + fn + '`',
+    field: path => 'Feld `' + path + '`',
+    rulesHead: '## Regeln',
+    rules: [
+      '- Fehlt ein Feld im Payload, entfällt das Segment stillschweigend — niemals `null` oder leere Slots drucken.',
+      '- Segmente mit fester Quelle (`fester Text`) werden immer gedruckt, sie dienen als Blocktrenner.',
+      '- `resets_at` kann Epoch-Sekunden, Millisekunden oder ISO-String sein; alle drei abfangen.',
+      '- Es gibt nur die Buckets `rate_limits.five_hour` und `rate_limits.seven_day`.',
+      '- Farben als Truecolor (`ESC[38;2;r;g;bm`), am Ende jedes Segments zurücksetzen.',
+      '- Das ganze Rendering in try/catch; im Fehlerfall nur Modell und Verzeichnis ausgeben.'
+    ],
+    configHead: '## Fertige Konfiguration',
+    configIntro: 'Falls du sie direkt übernehmen willst — das ist exakt die Config, die mein Builder erzeugt hat:'
+  },
+
+  en: {
+    intro: 'Please set up my Claude Code status line.',
+    goalHead: '## Goal',
+    goal: path => [
+      'A Node script at `' + path + '` that reads the status line JSON payload from stdin',
+      'and prints the line described below. No `jq`, no dependencies — just Node.',
+      'Then add this to `~/.claude/settings.json`:'
+    ],
+    layoutHead: '## Layout',
+    lineCount: n => '- Lines: ' + n + ', each with its own separator (see below)',
+    order: '- Segments in exactly this order:',
+    line: n => 'Line ' + n,
+    separator: 'separator',
+    dimmed: '(dimmed)',
+    format: 'Format',
+    colour: 'Colour',
+    emoji: 'Emoji',
+    label: 'Label',
+    noColour: 'no colour',
+    fixed: 'fixed',
+    thresholds: 'thresholds',
+    gradient: 'gradient',
+    over: 'across',
+    literal: v => 'fixed text `' + v + '`',
+    derived: fn => 'derived via `' + fn + '`',
+    field: path => 'field `' + path + '`',
+    rulesHead: '## Rules',
+    rules: [
+      '- If a field is missing from the payload, drop the segment silently — never print `null` or an empty slot.',
+      '- Segments with a fixed source (`fixed text`) are always printed; they act as block dividers.',
+      '- `resets_at` may be epoch seconds, milliseconds or an ISO string; handle all three.',
+      '- There are only the buckets `rate_limits.five_hour` and `rate_limits.seven_day`.',
+      '- Colours as truecolor (`ESC[38;2;r;g;bm`), reset after every segment.',
+      '- Wrap the whole render in try/catch; on failure print only the model and the directory.'
+    ],
+    configHead: '## Finished configuration',
+    configIntro: 'If you want to take it over directly — this is exactly the config my builder produced:'
+  }
+};
+
+function describeColor(color, L) {
+  if (!color) return L.noColour;
+  if (color.mode === 'static') return L.fixed + ' ' + color.value;
   if (color.mode === 'threshold') {
-    return 'Schwellen ' + (color.stops || []).map(([at, hex]) => at + '→' + hex).join(', ');
+    return L.thresholds + ' ' + (color.stops || []).map(([at, hex]) => at + '→' + hex).join(', ');
   }
   if (color.mode === 'gradient') {
-    return 'Verlauf ' + color.from + '→' + color.to + ' über ' + color.min + '–' + color.max;
+    return L.gradient + ' ' + color.from + '→' + color.to + ' ' + L.over + ' ' + color.min + '–' + color.max;
   }
   return color.mode;
 }
@@ -1914,67 +2738,61 @@ function describeFormat(format) {
   return bits.join(' ');
 }
 
-function describeSource(segment) {
-  if (isBlock(segment)) return 'fester Text `' + segment.source.value + '`';
-  if (segment.source && segment.source.kind === 'derived') return 'abgeleitet über `' + segment.source.fn + '`';
-  return 'Feld `' + (segment.source ? segment.source.path : '?') + '`';
+function describeSource(segment, L) {
+  if (isBlock(segment)) return L.literal(segment.source.value);
+  if (segment.source && segment.source.kind === 'derived') return L.derived(segment.source.fn);
+  return L.field(segment.source ? segment.source.path : '?');
 }
 
 function generatePrompt(config, opts = {}) {
   const cfg = normaliseConfig(config);
   const installPath = opts.installPath || DEFAULT_INSTALL_PATH;
+  const L = PROMPT_TEXT[opts.lang || lang()] || PROMPT_TEXT.en;
 
   const lines = [];
   for (let line = 0; line < cfg.lineCount; line++) {
     const onThisLine = cfg.segments.filter(s => (Number(s.line) || 0) === line);
     if (!onThisLine.length) continue;
     lines.push('');
-    lines.push('**Zeile ' + (line + 1) + '** — Trenner `' + cfg.separators[line] + '`' +
-      (cfg.dimSeparator ? ' (gedimmt)' : ''));
+    lines.push('**' + L.line(line + 1) + '** — ' + L.separator + ' `' + cfg.separators[line] + '`' +
+      (cfg.dimSeparator ? ' ' + L.dimmed : ''));
     onThisLine.forEach((s, i) => {
       const parts = [
         (i + 1) + '. `' + s.id + '`',
-        describeSource(s),
-        'Format: ' + describeFormat(s.format),
-        'Farbe: ' + describeColor(s.color)
+        describeSource(s, L),
+        L.format + ': ' + describeFormat(s.format),
+        L.colour + ': ' + describeColor(s.color, L)
       ];
-      if (s.showEmoji !== false && s.emoji) parts.push('Emoji: ' + s.emoji);
-      if (s.showLabel && s.label) parts.push('Label: ' + s.label);
+      if (s.showEmoji !== false && s.emoji) parts.push(L.emoji + ': ' + s.emoji);
+      if (s.showLabel && s.label) parts.push(L.label + ': ' + s.label);
       lines.push('   - ' + parts.join(' · '));
     });
   }
 
   return [
-    'Bitte richte meine Claude Code Statusline ein.',
+    L.intro,
     '',
-    '## Ziel',
+    L.goalHead,
     '',
-    'Ein Node-Skript unter `' + installPath + '`, das den Statusline-JSON-Payload von stdin liest',
-    'und die unten beschriebene Zeile ausgibt. Kein `jq`, keine Dependencies — nur Node.',
-    'Danach `~/.claude/settings.json` eintragen:',
+    ...L.goal(installPath),
     '',
     '```json',
     '"statusLine": { "type": "command", "command": "node ' + installPath + '" }',
     '```',
     '',
-    '## Aufbau',
+    L.layoutHead,
     '',
-    '- Zeilen: ' + cfg.lineCount + ', jede mit eigenem Trenner (siehe unten)',
-    '- Segmente in genau dieser Reihenfolge:',
+    L.lineCount(cfg.lineCount),
+    L.order,
     ...lines,
     '',
-    '## Regeln',
+    L.rulesHead,
     '',
-    '- Fehlt ein Feld im Payload, entfällt das Segment stillschweigend — niemals `null` oder leere Slots drucken.',
-    '- Segmente mit fester Quelle (`fester Text`) werden immer gedruckt, sie dienen als Blocktrenner.',
-    '- `resets_at` kann Epoch-Sekunden, Millisekunden oder ISO-String sein; alle drei abfangen.',
-    '- Es gibt nur die Buckets `rate_limits.five_hour` und `rate_limits.seven_day`.',
-    '- Farben als Truecolor (`ESC[38;2;r;g;bm`), am Ende jedes Segments zurücksetzen.',
-    '- Das ganze Rendering in try/catch; im Fehlerfall nur Modell und Verzeichnis ausgeben.',
+    ...L.rules,
     '',
-    '## Fertige Konfiguration',
+    L.configHead,
     '',
-    'Falls du sie direkt übernehmen willst — das ist exakt die Config, die mein Builder erzeugt hat:',
+    L.configIntro,
     '',
     '```json',
     generateConfigJson(cfg),
@@ -2058,6 +2876,7 @@ function defaultState() {
   const os = detectOs();
   return {
     os,
+    lang: detectLang(),
     segments: REFERENCE_ORDER.map(id => ({ ...CATALOG_BY_ID[id] })),
     separator: DEFAULT_SEPARATOR,
     separators: Array.from({ length: MAX_LINES }, () => DEFAULT_SEPARATOR),
@@ -2092,6 +2911,7 @@ function load() {
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (!stored) return base;
+    if (LANGS.indexOf(stored.lang) === -1) stored.lang = base.lang;
     const separator = typeof stored.separator === 'string' ? stored.separator : base.separator;
     return {
       ...base,
@@ -2110,8 +2930,15 @@ let state = null;
 const listeners = new Set();
 
 function getState() {
-  if (!state) state = load();
+  if (!state) {
+    state = load();
+    setLang(state.lang);
+  }
   return state;
+}
+
+function setLanguage(value) {
+  patch({ lang: setLang(value) });
 }
 
 function subscribe(fn) {
@@ -2156,6 +2983,66 @@ function toConfig() {
 
 const HOUR = 3600 * 1000;
 
+const MONO_STACK = 'ui-monospace, "Cascadia Code", Consolas, monospace';
+const SANS_STACK = 'ui-sans-serif, "Segoe UI", Helvetica, Arial, sans-serif';
+
+// Canvas gives the same advances the SVG renderer will use, including the
+// double-width emoji. Without a canvas we fall back to a terminal-cell estimate.
+function makeMeasurer() {
+  let context = null;
+  try {
+    const canvas = document.createElement('canvas');
+    context = canvas.getContext ? canvas.getContext('2d') : null;
+  } catch {
+    context = null;
+  }
+
+  return (text, size, family) => {
+    if (context) {
+      context.font = size + 'px ' + (family === 'mono' ? MONO_STACK : SANS_STACK);
+      return context.measureText(String(text)).width;
+    }
+    const chars = Array.from(String(text));
+    if (family === 'mono') {
+      return chars.reduce((n, c) => n + (c.codePointAt(0) > 0x2000 ? 2 : 1), 0) * size * 0.6;
+    }
+    return chars.length * size * 0.55;
+  };
+}
+
+function cheatsheetSvg() {
+  return buildCheatsheetSvg(toConfig(), previewPayload(), makeMeasurer(), { now: Date.now() });
+}
+
+// Rasterises through an <img>, which the browser renders with local fonts. The
+// SVG has no external references, so nothing can be blocked here.
+function svgToPngBlob(svg, scale = 2) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth * scale;
+        canvas.height = image.naturalHeight * scale;
+        const context = canvas.getContext('2d');
+        context.scale(scale, scale);
+        context.drawImage(image, 0, 0);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error(tt('err.pngBlob')))), 'image/png');
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        reject(error);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error(tt('err.pngRender')));
+    };
+    image.src = url;
+  });
+}
+
 // SAMPLE_PAYLOAD is injected by build.js from sample-payload.json.
 function previewPayload() {
   const { preview } = getState();
@@ -2180,25 +3067,16 @@ function renderPreview(el, readoutEl) {
 
   const now = Date.now();
   const bits = [
-    ['heute übrig', todayLeft(payload, now), '%'],
-    ['Tempo', pace(payload, now), '%/d'],
-    ['vs. Even-Burn', evenBurn(payload, now), '']
+    [tt('readout.today'), todayLeft(payload, now), '%'],
+    [tt('readout.pace'), pace(payload, now), '%/d'],
+    [tt('readout.burn'), evenBurn(payload, now), '']
   ]
     .filter(([, v]) => v !== null)
     .map(([label, v, unit]) => label + ' ' + v.toFixed(0) + unit);
   readoutEl.textContent = bits.join('  ·  ');
 }
 
-const HINTS = {
-  script: 'Das ist die Datei, die installiert wird. Unten Schritt für Schritt.',
-  prompt: 'An Claude geben — enthält Segmentliste, Regeln und die fertige Config.',
-  config: 'Nur eine Sicherung der Einstellungen — NICHT die Datei, die installiert wird. Zum Zurückladen den Tab „Laden" nehmen.',
-  load: 'Bestehendes statusline.js oder eine Config einfügen bzw. Datei wählen, dann Übernehmen.'
-};
-
-const LOAD_PLACEHOLDER =
-  'Hier ein erzeugtes statusline.js einfügen (der CFG-Block wird ausgelesen) oder eine Config-JSON.\n' +
-  'Alternativ oben eine Datei wählen — z. B. ~/.claude/statusline.js';
+const hintFor = tab => tt('hint.' + tab);
 
 function exportText(tab) {
   const config = toConfig();
@@ -2221,20 +3099,23 @@ function inIframe() {
   }
 }
 
-function download(tab, text) {
-  // text/plain makes browsers append .txt to a .js filename; octet-stream keeps
-  // the name from the download attribute intact.
-  const blob = new Blob([text], { type: 'application/octet-stream' });
+function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = FILENAMES[tab] || 'statusline.txt';
+  a.download = filename;
   a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
   a.remove();
   // Revoking straight away can cancel the download before it starts.
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function download(tab, text) {
+  // text/plain makes browsers append .txt to a .js filename; octet-stream keeps
+  // the name from the download attribute intact.
+  downloadBlob(new Blob([text], { type: 'application/octet-stream' }), FILENAMES[tab] || 'statusline.txt');
 }
 
 async function copyText(text, button, node) {
@@ -2259,7 +3140,7 @@ async function copyText(text, button, node) {
     }
   }
 
-  button.textContent = ok ? 'Kopiert' : 'Bitte manuell kopieren';
+  button.textContent = ok ? tt('action.copied') : tt('action.copyFailed');
   setTimeout(() => { button.textContent = original; }, 1800);
 }
 
@@ -2277,6 +3158,7 @@ function importConfig(text) {
 }
 
 let lastTab = null;
+let lastHintLang = null;
 
 function mountExport(dom, rebuild) {
   dom.tabs.forEach(button => {
@@ -2296,9 +3178,7 @@ function mountExport(dom, rebuild) {
       } catch {
         // Selecting is a convenience; ignore browsers that refuse it.
       }
-      dom.hint.textContent =
-        'Kommt kein Download an, blockiert ihn die Sandbox. Nimm die vier Schritte unten — ' +
-        'die brauchen keinen Download.';
+      dom.hint.textContent = tt('download.sandboxed');
     }
   });
 
@@ -2312,8 +3192,7 @@ function mountExport(dom, rebuild) {
     }
     patch({ tab: 'script' });
     rebuild();
-    dom.hint.textContent = 'Übernommen — ' + config.segments.length +
-      ' Segmente, ' + config.lineCount + (config.lineCount === 1 ? ' Zeile.' : ' Zeilen.');
+    dom.hint.textContent = tt('load.done', { segments: config.segments.length, lines: config.lineCount });
   });
 
   if (dom.loadFile) {
@@ -2324,9 +3203,9 @@ function mountExport(dom, rebuild) {
       reader.onload = () => {
         dom.out.value = String(reader.result || '');
         if (dom.loadFileName) dom.loadFileName.textContent = file.name;
-        dom.hint.textContent = 'Datei gelesen. Jetzt „Übernehmen" drücken.';
+        dom.hint.textContent = tt('load.fileRead');
       };
-      reader.onerror = () => { dom.hint.textContent = 'Datei konnte nicht gelesen werden.'; };
+      reader.onerror = () => { dom.hint.textContent = tt('load.fileFailed'); };
       reader.readAsText(file);
     });
   }
@@ -2342,6 +3221,33 @@ function mountExport(dom, rebuild) {
     dom.copyCommand.addEventListener('click', () => {
       const { os, installPath } = getState();
       copyText(writeToFileCommand(os, installPath), dom.copyCommand, dom.installCommand);
+    });
+  }
+
+  if (dom.cheatSvg) {
+    dom.cheatSvg.addEventListener('click', () =>
+      downloadBlob(new Blob([cheatsheetSvg()], { type: 'image/svg+xml;charset=utf-8' }), 'statusline-cheatsheet.svg'));
+  }
+
+  if (dom.cheatCopy) {
+    dom.cheatCopy.addEventListener('click', () => copyText(cheatsheetSvg(), dom.cheatCopy, null));
+  }
+
+  if (dom.cheatPng) {
+    dom.cheatPng.addEventListener('click', () => {
+      const button = dom.cheatPng;
+      const label = button.dataset.label || button.textContent;
+      button.dataset.label = label;
+      button.textContent = tt('action.rendering');
+      svgToPngBlob(cheatsheetSvg())
+        .then(blob => {
+          downloadBlob(blob, 'statusline-cheatsheet.png');
+          button.textContent = label;
+        })
+        .catch(error => {
+          button.textContent = label;
+          dom.hint.textContent = tt('cheat.pngFailed', { message: error.message });
+        });
     });
   }
 
@@ -2365,14 +3271,20 @@ function renderExport(dom) {
     button.setAttribute('aria-selected', String(button.dataset.tab === tab));
   });
 
-  if (tab === 'load') {
+  const isCheat = tab === 'cheat';
+  dom.out.hidden = isCheat;
+  if (dom.cheatPanel) dom.cheatPanel.hidden = !isCheat;
+
+  if (isCheat) {
+    if (dom.cheatPreview) dom.cheatPreview.innerHTML = cheatsheetSvg();
+  } else if (tab === 'load') {
     // Only clear on arrival, so a paste survives the re-render that follows it.
     if (tabChanged) {
       dom.out.value = '';
       if (dom.loadFileName) dom.loadFileName.textContent = '';
     }
     dom.out.readOnly = false;
-    dom.out.placeholder = LOAD_PLACEHOLDER;
+    dom.out.placeholder = tt('load.placeholder');
   } else {
     // Export views are read-only, so there is never a user edit to protect —
     // always rewrite them, otherwise they go stale after an import.
@@ -2381,11 +3293,15 @@ function renderExport(dom) {
     dom.out.placeholder = '';
   }
 
+  // The cheat sheet and the load view bring their own buttons.
   dom.import.hidden = tab !== 'load';
-  dom.download.hidden = tab === 'load';
-  dom.copy.hidden = tab === 'load';
+  dom.download.hidden = tab === 'load' || isCheat;
+  dom.copy.hidden = tab === 'load' || isCheat;
   if (dom.loadControls) dom.loadControls.hidden = tab !== 'load';
-  if (tabChanged) dom.hint.textContent = HINTS[tab];
+  // The hint also has to follow a language switch, not just a tab change.
+  const currentLang = lang();
+  if (tabChanged || lastHintLang !== currentLang) dom.hint.textContent = hintFor(tab);
+  lastHintLang = currentLang;
 
   dom.osButtons.forEach(button => {
     button.setAttribute('aria-pressed', String(button.dataset.os === os));
@@ -2417,52 +3333,52 @@ const el = (tag, props = {}, children = []) => {
 
 const FORMAT_CHOICES = {
   path: [
-    { label: 'Ordnername', patch: { mode: 'basename' } },
-    { label: 'Letzte 2 Ebenen', patch: { mode: 'last2' } },
-    { label: 'Voller Pfad', patch: { mode: 'full' } },
-    { label: 'Home als ~', patch: { mode: 'tilde' } }
+    { key: 'fmt.basename', patch: { mode: 'basename' } },
+    { key: 'fmt.last2', patch: { mode: 'last2' } },
+    { key: 'fmt.full', patch: { mode: 'full' } },
+    { key: 'fmt.tilde', patch: { mode: 'tilde' } }
   ],
   percent: [
-    { label: 'ganzzahlig', patch: { decimals: 0 } },
-    { label: '1 Nachkomma', patch: { decimals: 1 } }
+    { key: 'fmt.int', patch: { decimals: 0 } },
+    { key: 'fmt.decimal1', patch: { decimals: 1 } }
   ],
   number: [
-    { label: 'gekürzt 95k', patch: { abbrev: true } },
-    { label: 'voll 95000', patch: { abbrev: false } }
+    { key: 'fmt.short', patch: { abbrev: true } },
+    { key: 'fmt.long', patch: { abbrev: false } }
   ],
   text: [
-    { label: 'voll', patch: { max: 0, slice: 0 } },
-    { label: 'max 12', patch: { max: 12, slice: 0 } },
-    { label: 'max 24', patch: { max: 24, slice: 0 } },
-    { label: 'erste 8', patch: { max: 0, slice: 8 } }
+    { key: 'fmt.textFull', patch: { max: 0, slice: 0 } },
+    { key: 'fmt.max12', patch: { max: 12, slice: 0 } },
+    { key: 'fmt.max24', patch: { max: 24, slice: 0 } },
+    { key: 'fmt.first8', patch: { max: 0, slice: 8 } }
   ],
   bool: [
-    { label: 'nur wenn an', patch: { hideWhenFalse: true } },
-    { label: 'immer zeigen', patch: { hideWhenFalse: false, offLabel: 'off' } }
+    { key: 'fmt.onlyOn', patch: { hideWhenFalse: true } },
+    { key: 'fmt.always', patch: { hideWhenFalse: false, offLabel: 'off' } }
   ],
   arrow: [
-    { label: '▼▲ ganzzahlig', patch: { decimals: 0 } },
-    { label: '▼▲ 1 Nachkomma', patch: { decimals: 1 } }
+    { key: 'fmt.arrowInt', patch: { decimals: 0 } },
+    { key: 'fmt.arrowDecimal', patch: { decimals: 1 } }
   ],
   emojiScale: [
-    { label: 'Katzen', patch: { stops: MOOD_STOPS } },
-    { label: 'Ampel', patch: { stops: [[0, '🟢'], [50, '🟡'], [75, '🟠'], [90, '🔴']] } },
-    { label: 'Wetter', patch: { stops: [[0, '☀️'], [40, '⛅'], [65, '🌧️'], [85, '⛈️']] } },
-    { label: 'Akku', patch: { stops: [[0, '🔋'], [50, '🪫']] } }
+    { key: 'fmt.cats', patch: { stops: MOOD_STOPS } },
+    { key: 'fmt.traffic', patch: { stops: [[0, '🟢'], [50, '🟡'], [75, '🟠'], [90, '🔴']] } },
+    { key: 'fmt.weather', patch: { stops: [[0, '☀️'], [40, '⛅'], [65, '🌧️'], [85, '⛈️']] } },
+    { key: 'fmt.battery', patch: { stops: [[0, '🔋'], [50, '🪫']] } }
   ],
-  countdown: [{ label: 'Restzeit', patch: {} }],
-  duration: [{ label: 'Dauer', patch: {} }],
-  currency: [{ label: 'USD', patch: {} }],
-  count: [{ label: 'Anzahl', patch: {} }],
-  raw: [{ label: 'unverändert', patch: {} }]
+  countdown: [{ key: 'fmt.countdown', patch: {} }],
+  duration: [{ key: 'fmt.duration', patch: {} }],
+  currency: [{ key: 'fmt.currency', patch: {} }],
+  count: [{ key: 'fmt.count', patch: {} }],
+  raw: [{ key: 'fmt.raw', patch: {} }]
 };
 
 const COLOR_CHOICES = [
-  { id: 'default', label: 'Standard' },
-  { id: 'usage', label: 'Ampel grün→rot' },
-  { id: 'inverse', label: 'Ampel invers' },
-  { id: 'static', label: 'Einfarbig' },
-  { id: 'gradient', label: 'Verlauf' }
+  { id: 'default', key: 'color.default' },
+  { id: 'usage', key: 'color.usage' },
+  { id: 'inverse', key: 'color.inverse' },
+  { id: 'static', key: 'color.static' },
+  { id: 'gradient', key: 'color.gradient' }
 ];
 
 const GRADIENT = { mode: 'gradient', from: '#7ec699', to: '#e06c75', min: 0, max: 100 };
@@ -2516,6 +3432,64 @@ const select = (options, selected, onChange) => {
   return node;
 };
 
+// ---- tooltips ----
+//
+// One shared node, positioned under whatever is hovered or focused. Native
+// title attributes would do the job but arrive after a delay and cannot carry
+// the source path on its own line.
+
+let tipNode = null;
+
+function tooltip() {
+  if (!tipNode) {
+    tipNode = el('div', { class: 'tip', role: 'tooltip' });
+    tipNode.hidden = true;
+    document.body.appendChild(tipNode);
+  }
+  return tipNode;
+}
+
+function sourceLabel(segment) {
+  if (!segment || !segment.source) return '';
+  if (segment.source.kind === 'literal') return tt('tip.literal');
+  if (segment.source.kind === 'derived') return tt('tip.derived', { fn: segment.source.fn });
+  return segment.source.path;
+}
+
+function positionTip(node, target) {
+  if (!target.getBoundingClientRect) return;
+  const rect = target.getBoundingClientRect();
+  const own = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+  const width = (own && own.width) || 260;
+  const viewport = (typeof window !== 'undefined' && window.innerWidth) || 1200;
+  node.style.left = Math.round(Math.max(10, Math.min(viewport - width - 10, rect.left))) + 'px';
+  node.style.top = Math.round(rect.bottom + 8) + 'px';
+}
+
+function showTip(target, segment) {
+  const help = helpText(segment, lang());
+  const source = sourceLabel(segment);
+  if (!help && !source) return;
+  const node = tooltip();
+  const children = [el('div', { class: 'tip__title', text: segment.label || segment.id })];
+  if (help) children.push(el('div', { class: 'tip__body', text: help }));
+  if (source) children.push(el('div', { class: 'tip__src', text: source }));
+  node.replaceChildren(...children);
+  node.hidden = false;
+  positionTip(node, target);
+}
+
+function hideTip() {
+  if (tipNode) tipNode.hidden = true;
+}
+
+function attachTip(target, segment) {
+  target.addEventListener('mouseenter', () => showTip(target, segment));
+  target.addEventListener('mouseleave', hideTip);
+  target.addEventListener('focus', () => showTip(target, segment));
+  target.addEventListener('blur', hideTip);
+}
+
 function mount() {
   const dom = {
     preview: document.getElementById('preview'),
@@ -2537,6 +3511,11 @@ function mount() {
     loadControls: document.getElementById('load-controls'),
     loadFile: document.getElementById('load-file'),
     loadFileName: document.getElementById('load-file-name'),
+    cheatPanel: document.getElementById('cheat-panel'),
+    cheatPreview: document.getElementById('cheat-preview'),
+    cheatPng: document.getElementById('cheat-png'),
+    cheatSvg: document.getElementById('cheat-svg'),
+    cheatCopy: document.getElementById('cheat-copy'),
     installPath: document.getElementById('install-path'),
     installCommand: document.getElementById('install-command'),
     verifyCommand: document.getElementById('verify-command'),
@@ -2544,6 +3523,7 @@ function mount() {
     copyScript: document.getElementById('copy-script'),
     copyCommand: document.getElementById('copy-command'),
     osButtons: Array.from(document.querySelectorAll('.os')),
+    langButtons: Array.from(document.querySelectorAll('.lang')),
     snippet: document.getElementById('settings-snippet'),
     sliders: [
       ['ctx', document.getElementById('pv-ctx'), document.getElementById('pv-ctx-out')],
@@ -2558,11 +3538,20 @@ function mount() {
   };
 
   const rebuild = () => {
+    applyStaticStrings(dom);
     renderSeparators(dom);
     renderCatalog(dom, rebuild);
     renderRows(dom, rebuild);
     refresh();
   };
+
+  dom.langButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      setLanguage(button.dataset.lang);
+      hideTip();
+      rebuild();
+    });
+  });
 
   dom.dimSeparator.addEventListener('change', () => patch({ dimSeparator: dom.dimSeparator.checked }));
 
@@ -2611,6 +3600,28 @@ function mount() {
   rebuild();
 }
 
+// Swaps the strings that live in the template rather than in JavaScript. The
+// markup is authored in English, so a failure here degrades to English rather
+// than to empty labels.
+function applyStaticStrings(dom) {
+  const each = (selector, apply) => {
+    const nodes = document.querySelectorAll ? document.querySelectorAll(selector) : [];
+    for (const node of nodes) apply(node);
+  };
+
+  each('[data-i18n]', node => { node.textContent = tt(node.getAttribute('data-i18n')); });
+  each('[data-i18n-html]', node => { node.innerHTML = tt(node.getAttribute('data-i18n-html')); });
+  each('[data-i18n-aria]', node => { node.setAttribute('aria-label', tt(node.getAttribute('data-i18n-aria'))); });
+
+  const current = lang();
+  dom.langButtons.forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.lang === current));
+  });
+  if (document.documentElement && document.documentElement.setAttribute) {
+    document.documentElement.setAttribute('lang', current);
+  }
+}
+
 function applySort(mode) {
   const state = getState();
   const segments = state.segments.slice();
@@ -2643,12 +3654,16 @@ function renderSeparators(dom) {
   for (let i = 0; i < state.lineCount; i++) {
     const index = i;
     dom.separators.appendChild(el('label', { class: 'sep-field' }, [
-      el('span', { text: state.lineCount > 1 ? 'Trenner Zeile ' + (index + 1) : 'Trenner' }),
+      el('span', {
+        text: state.lineCount > 1
+          ? tt('field.separatorLine', { n: index + 1 })
+          : tt('field.separator')
+      }),
       el('input', {
         type: 'text',
         list: 'sep-presets',
         value: state.separators[index],
-        'aria-label': 'Trenner für Zeile ' + (index + 1),
+        'aria-label': tt('field.separatorLine', { n: index + 1 }),
         oninput: event => {
           getState().separators[index] = event.target.value;
           if (index === 0) getState().separator = event.target.value;
@@ -2671,13 +3686,11 @@ function renderCatalog(dom, rebuild) {
     const list = el('div', { class: 'group__list' });
     for (const segment of members) {
       const on = active.has(segment.id);
-      list.appendChild(el('button', {
+      const chip = el('button', {
         class: 'chip',
         type: 'button',
         'aria-pressed': String(on),
-        title: segment.source.kind === 'derived'
-          ? 'berechnet: ' + segment.source.fn
-          : segment.source.path,
+        'data-help': helpText(segment, lang()),
         onclick: () => {
           const current = getState();
           const next = active.has(segment.id)
@@ -2689,13 +3702,15 @@ function renderCatalog(dom, rebuild) {
       }, [
         segment.emoji ? el('span', { class: 'chip__emoji', text: segment.emoji }) : null,
         el('span', { text: segment.label })
-      ]));
+      ]);
+      attachTip(chip, segment);
+      list.appendChild(chip);
     }
 
     dom.catalog.appendChild(el('div', { class: 'group' }, [
       el('div', { class: 'group__head' }, [
         el('span', { text: group.emoji }),
-        el('span', { text: group.label })
+        el('span', { text: tt('group.' + group.id) })
       ]),
       list
     ]));
@@ -2707,7 +3722,7 @@ function renderRows(dom, rebuild) {
   dom.rows.replaceChildren();
 
   if (!state.segments.length) {
-    dom.rows.appendChild(el('p', { class: 'empty', text: 'Noch nichts ausgewählt — links Segmente antippen.' }));
+    dom.rows.appendChild(el('p', { class: 'empty', text: tt('builder.empty') }));
     return;
   }
 
@@ -2729,7 +3744,7 @@ function renderRows(dom, rebuild) {
       class: 'row__swatch',
       type: 'color',
       value: (segment.color || {}).mode === 'static' ? (segment.color.value || '#c8ccd4') : '#c8ccd4',
-      'aria-label': 'Farbe für ' + segment.id,
+      'aria-label': tt('row.colorAria', { id: segment.id }),
       oninput: event => {
         segment.color = { mode: 'static', value: event.target.value };
         commit();
@@ -2743,8 +3758,8 @@ function renderRows(dom, rebuild) {
           class: 'row__block',
           type: 'text',
           value: segment.source.value,
-          placeholder: 'Blocktext',
-          'aria-label': 'Text des Blocks',
+          placeholder: tt('row.blockPlaceholder'),
+          'aria-label': tt('row.blockAria'),
           oninput: event => {
             segment.source = { kind: 'literal', value: event.target.value };
             commit();
@@ -2752,7 +3767,7 @@ function renderRows(dom, rebuild) {
         })
       : (choices.length > 1
           ? select(
-              choices.map((choice, i) => ({ value: String(i), label: choice.label })),
+              choices.map((choice, i) => ({ value: String(i), label: tt(choice.key) })),
               String(activeFormatChoice(segment)),
               value => {
                 segment.format = { ...segment.format, ...choices[Number(value)].patch };
@@ -2766,8 +3781,8 @@ function renderRows(dom, rebuild) {
       type: 'text',
       maxlength: '18',
       value: segment.showLabel ? (segment.label || '') : '',
-      placeholder: block ? '—' : (catalogueLabel || 'Label'),
-      'aria-label': 'Label für ' + segment.id,
+      placeholder: block ? '—' : (catalogueLabel || tt('row.labelPlaceholder')),
+      'aria-label': tt('row.labelAria', { id: segment.id }),
       oninput: event => {
         const text = event.target.value;
         segment.showLabel = text.length > 0;
@@ -2777,13 +3792,19 @@ function renderRows(dom, rebuild) {
     });
     if (block) labelInput.disabled = true;
 
+    const name = el('div', {
+      class: 'row__name',
+      tabindex: '0',
+      'data-help': helpText(segment, lang())
+    }, [
+      el('span', { class: 'row__id', text: segment.id }),
+      el('span', { class: 'row__group', text: block ? tt('group.block') : tt('group.' + segment.group) })
+    ]);
+    attachTip(name, segment);
+
     const row = el('div', { class: 'row', draggable: 'true' }, [
       el('span', { class: 'row__grip', text: '⠿', 'aria-hidden': 'true' }),
-
-      el('div', { class: 'row__name' }, [
-        el('span', { class: 'row__id', text: segment.id, title: segment.id }),
-        el('span', { class: 'row__group', text: block ? 'Block' : segment.group })
-      ]),
+      name,
 
       el('input', {
         class: 'row__emoji',
@@ -2791,7 +3812,7 @@ function renderRows(dom, rebuild) {
         maxlength: '4',
         value: segment.emoji || '',
         placeholder: '–',
-        'aria-label': 'Emoji für ' + segment.id,
+        'aria-label': tt('row.emojiAria', { id: segment.id }),
         oninput: event => {
           segment.emoji = event.target.value;
           segment.showEmoji = event.target.value.length > 0;
@@ -2802,7 +3823,7 @@ function renderRows(dom, rebuild) {
       contentCell,
 
       select(
-        COLOR_CHOICES.map(choice => ({ value: choice.id, label: choice.label })),
+        COLOR_CHOICES.map(choice => ({ value: choice.id, label: tt(choice.key) })),
         colorId,
         value => {
           segment.color = colorFor(value, segment);
@@ -2813,7 +3834,7 @@ function renderRows(dom, rebuild) {
       ),
 
       select(
-        Array.from({ length: state.lineCount }, (_, i) => ({ value: String(i), label: 'Zeile ' + (i + 1) })),
+        Array.from({ length: state.lineCount }, (_, i) => ({ value: String(i), label: tt('row.line', { n: i + 1 }) })),
         String(Math.min(segment.line || 0, state.lineCount - 1)),
         value => {
           segment.line = Number(value);
@@ -2826,15 +3847,15 @@ function renderRows(dom, rebuild) {
 
       el('div', { class: 'row__toggle' }, [
         el('button', {
-          class: 'icon-btn', type: 'button', title: 'nach oben',
+          class: 'icon-btn', type: 'button', title: tt('row.up'),
           onclick: () => move(index, index - 1)
         }, [el('span', { text: '↑' })]),
         el('button', {
-          class: 'icon-btn', type: 'button', title: 'nach unten',
+          class: 'icon-btn', type: 'button', title: tt('row.down'),
           onclick: () => move(index, index + 1)
         }, [el('span', { text: '↓' })]),
         el('button', {
-          class: 'icon-btn icon-btn--danger', type: 'button', title: 'entfernen',
+          class: 'icon-btn icon-btn--danger', type: 'button', title: tt('row.remove'),
           onclick: () => {
             patch({ segments: getState().segments.filter((_, i) => i !== index), sort: 'manual' });
             rebuild();

@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { buildBundle } from '../build.js';
 import { generateScript } from '../src/generate.js';
-import { CATALOG_BY_ID } from '../src/catalog.js';
+import { CATALOG_BY_ID, helpText } from '../src/catalog.js';
 
 const template = readFileSync(new URL('../src/index.template.html', import.meta.url), 'utf8');
 
@@ -24,6 +24,9 @@ const tabsInTemplate = () =>
 
 const osesInTemplate = () =>
   Array.from(template.matchAll(/class="os"[^>]*data-os="([^"]+)"/g)).map(m => m[1]);
+
+const langsInTemplate = () =>
+  Array.from(template.matchAll(/class="lang"[^>]*data-lang="([^"]+)"/g)).map(m => m[1]);
 
 function makeElement(tag = 'div') {
   const listeners = new Map();
@@ -94,6 +97,12 @@ function makeSandbox() {
     return button;
   });
 
+  const langButtons = langsInTemplate().map(name => {
+    const button = makeElement('button');
+    button.dataset.lang = name;
+    return button;
+  });
+
   const anchors = [];
   const clipboard = [];
   const store = new Map();
@@ -104,6 +113,7 @@ function makeSandbox() {
     querySelectorAll: selector => {
       if (selector === '.tab') return tabs;
       if (selector === '.os') return osButtons;
+      if (selector === '.lang') return langButtons;
       return [];
     },
     createElement: tag => {
@@ -140,7 +150,7 @@ function makeSandbox() {
     JSON, Math, Date, Number, String, Boolean, Array, Object, Error, Set, Map, RegExp, Intl
   };
   sandbox.globalThis = sandbox;
-  return { sandbox, byId, tabs, osButtons, store, anchors, clipboard };
+  return { sandbox, byId, tabs, osButtons, langButtons, store, anchors, clipboard, body: document.body };
 }
 
 const boot = () => {
@@ -202,7 +212,7 @@ test('the line-count dropdown changes how many lines a segment can go to', () =>
   const { byId } = boot();
   const lineSelects = () => walk(byId.get('rows'))
     .filter(n => n.tagName === 'SELECT')
-    .filter(n => n.children.some(o => String(o.textContent).startsWith('Zeile')));
+    .filter(n => n.children.some(o => String(o.textContent).startsWith('Line')));
   assert.equal(lineSelects()[0].children.length, 1);
   const lineCount = byId.get('line-count');
   lineCount.value = '3';
@@ -303,7 +313,7 @@ test('switching the export tab swaps the output', () => {
 
   tabs.find(t => t.dataset.tab === 'prompt').fire('click');
   assert.notEqual(out.value, script);
-  assert.match(out.value, /Statusline/);
+  assert.match(out.value, /status line/);
 
   tabs.find(t => t.dataset.tab === 'config').fire('click');
   assert.match(out.value, /"segments"/);
@@ -358,7 +368,7 @@ test('loading a generated script rebuilds rows, chips and the export view', () =
   // …and it lands back on the script tab showing the imported config.
   assert.match(byId.get('export-out').value, /^#!\/usr\/bin\/env node/);
   assert.match(byId.get('export-out').value, /"separator": " :: "/);
-  assert.match(byId.get('export-hint').textContent, /Übernommen — 2 Segmente/);
+  assert.match(byId.get('export-hint').textContent, /Applied — 2 segments/);
 });
 
 test('a bad paste reports why and leaves the config alone', () => {
@@ -367,7 +377,7 @@ test('a bad paste reports why and leaves the config alone', () => {
   tabs.find(t => t.dataset.tab === 'load').fire('click');
   byId.get('export-out').value = '#!/usr/bin/env bash\njq -r .model';
   byId.get('import').fire('click');
-  assert.match(byId.get('export-hint').textContent, /Bash-Statusline/);
+  assert.match(byId.get('export-hint').textContent, /bash status line/);
   tabs.find(t => t.dataset.tab === 'script').fire('click');
   assert.equal(rowCount(byId), before);
 });
@@ -486,4 +496,163 @@ test('the settings snippet always invokes node, never bash', () => {
     assert.ok(command.startsWith('node '), os + ': ' + command);
     assert.equal(command.includes('bash'), false);
   }
+});
+
+// ---- tooltips ----
+
+test('every catalogue chip carries its explanation', () => {
+  const { byId } = boot();
+  const chips = nodesOfClass(byId, 'catalog', 'chip');
+  const without = chips.filter(c => !c.getAttribute('data-help'));
+  assert.deepEqual(without.map(c => c.textContent), []);
+});
+
+test('hovering a chip opens a tooltip with title, text and source', () => {
+  const { byId, body } = boot();
+  const chip = nodesOfClass(byId, 'catalog', 'chip')[0];
+  chip.fire('mouseenter');
+
+  const tip = walk(body).find(n => n.className === 'tip');
+  assert.ok(tip, 'no tooltip node was created');
+  assert.equal(tip.hidden, false);
+  const texts = tip.children.map(c => c.textContent);
+  assert.equal(texts.length, 3, texts.join(' | '));
+  assert.ok(texts[1].length > 10, 'explanation is missing');
+
+  chip.fire('mouseleave');
+  assert.equal(tip.hidden, true);
+});
+
+test('the tooltip follows focus as well as hover', () => {
+  const { byId, body } = boot();
+  const chip = nodesOfClass(byId, 'catalog', 'chip')[0];
+  chip.fire('focus');
+  const tip = walk(body).find(n => n.className === 'tip');
+  assert.equal(tip.hidden, false);
+  chip.fire('blur');
+  assert.equal(tip.hidden, true);
+});
+
+test('builder rows explain themselves too and stay keyboard reachable', () => {
+  const { byId, body } = boot();
+  const name = nodesOfClass(byId, 'rows', 'row__name')[0];
+  assert.equal(name.getAttribute('tabindex'), '0');
+  name.fire('mouseenter');
+  const tip = walk(body).find(n => n.className === 'tip');
+  assert.ok(tip.children[1].textContent.length > 10);
+});
+
+test('a block tooltip says the text is fixed', () => {
+  const { byId, body } = boot();
+  byId.get('add-block').fire('click');
+  const name = nodesOfClass(byId, 'rows', 'row__name').at(-1);
+  name.fire('mouseenter');
+  const tip = walk(body).find(n => n.className === 'tip');
+  assert.match(tip.children.at(-1).textContent, /fixed text/);
+});
+
+// ---- cheat sheet tab ----
+
+test('the cheat sheet tab swaps the textarea for the rendered sheet', () => {
+  const { byId, tabs } = boot();
+  assert.equal(byId.get('cheat-panel').hidden, true);
+
+  tabs.find(t => t.dataset.tab === 'cheat').fire('click');
+  assert.equal(byId.get('cheat-panel').hidden, false);
+  assert.equal(byId.get('export-out').hidden, true);
+  assert.equal(byId.get('copy').hidden, true);
+  assert.equal(byId.get('download').hidden, true);
+
+  const svg = byId.get('cheat-preview').innerHTML;
+  assert.ok(svg.startsWith('<svg '), svg.slice(0, 30));
+  assert.ok(svg.includes('github.com/Qeridoo/statusline-builder'));
+  assert.ok(svg.includes('Opus 5'));
+});
+
+test('the cheat sheet reflects the current segments', () => {
+  const { byId, tabs } = boot();
+  byId.get('clear-all').fire('click');
+  // Several segments share the label "ctx…", so match on the unique help text.
+  const chip = nodesOfClass(byId, 'catalog', 'chip')
+    .find(c => c.getAttribute('data-help') === helpText(CATALOG_BY_ID.ctx_used, 'en'));
+  assert.ok(chip, 'ctx chip not found');
+  chip.fire('click');
+
+  tabs.find(t => t.dataset.tab === 'cheat').fire('click');
+  const svg = byId.get('cheat-preview').innerHTML;
+  assert.ok(svg.includes('>CTX<'));
+  assert.equal(svg.includes('>MODEL<'), false);
+});
+
+test('copying the cheat sheet puts the svg on the clipboard', () => {
+  const { byId, tabs, clipboard } = boot();
+  tabs.find(t => t.dataset.tab === 'cheat').fire('click');
+  byId.get('cheat-copy').fire('click');
+  assert.ok(clipboard[clipboard.length - 1].startsWith('<svg '));
+});
+
+test('downloading the cheat sheet names the svg file', () => {
+  const { byId, tabs, anchors } = boot();
+  tabs.find(t => t.dataset.tab === 'cheat').fire('click');
+  byId.get('cheat-svg').fire('click');
+  assert.equal(anchors[0].download, 'statusline-cheatsheet.svg');
+  assert.equal(anchors[0].clicks, 1);
+});
+
+// ---- language switch ----
+
+test('the app starts in English and marks the active language', () => {
+  const { byId, langButtons } = boot();
+  assert.deepEqual(langButtons.map(b => b.getAttribute('aria-pressed')), ['true', 'false']);
+  assert.match(byId.get('export-hint').textContent, /file that gets installed/);
+});
+
+test('switching to German retranslates rows, hints and tooltips', () => {
+  const { byId, langButtons, body } = boot();
+  langButtons.find(b => b.dataset.lang === 'de').fire('click');
+
+  assert.deepEqual(langButtons.map(b => b.getAttribute('aria-pressed')), ['false', 'true']);
+
+  const lineOption = walk(byId.get('rows'))
+    .filter(n => n.tagName === 'SELECT')
+    .flatMap(n => n.children)
+    .find(o => String(o.textContent).startsWith('Zeile'));
+  assert.ok(lineOption, 'line options were not translated');
+
+  const chip = nodesOfClass(byId, 'catalog', 'chip')[0];
+  assert.equal(chip.getAttribute('data-help'), helpText(CATALOG_BY_ID.session_name, 'de'));
+  chip.fire('mouseenter');
+  assert.match(walk(body).find(n => n.className === 'tip').children[1].textContent, /Session/);
+});
+
+test('the German prompt and cheat sheet follow the switch', () => {
+  const { byId, tabs, langButtons } = boot();
+  langButtons.find(b => b.dataset.lang === 'de').fire('click');
+
+  tabs.find(t => t.dataset.tab === 'prompt').fire('click');
+  assert.match(byId.get('export-out').value, /^Bitte richte meine Claude Code Statusline ein\./);
+
+  tabs.find(t => t.dataset.tab === 'cheat').fire('click');
+  assert.ok(byId.get('cheat-preview').innerHTML.includes('Claude Code Statusline'));
+});
+
+test('the chosen language survives a reload', () => {
+  const ctx = boot();
+  ctx.langButtons.find(b => b.dataset.lang === 'de').fire('click');
+
+  const second = makeSandbox();
+  second.store.set('statusline-builder:v1', ctx.store.get('statusline-builder:v1'));
+  runInNewContext(buildBundle(), second.sandbox);
+  assert.deepEqual(second.langButtons.map(b => b.getAttribute('aria-pressed')), ['false', 'true']);
+  assert.match(second.byId.get('export-hint').textContent, /installiert wird/);
+});
+
+test('switching back to English restores the English strings', () => {
+  const { byId, langButtons } = boot();
+  langButtons.find(b => b.dataset.lang === 'de').fire('click');
+  langButtons.find(b => b.dataset.lang === 'en').fire('click');
+  assert.equal(
+    nodesOfClass(byId, 'catalog', 'chip')[0].getAttribute('data-help'),
+    helpText(CATALOG_BY_ID.session_name, 'en')
+  );
 });

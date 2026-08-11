@@ -4,6 +4,7 @@
 import { RUNTIME_SOURCE } from './runtime.js';
 import { CATALOG_BY_ID, isBlock } from './catalog.js';
 import { DEFAULT_SEPARATOR } from './render.js';
+import { tt, lang } from './i18n.js';
 
 const SEGMENT_KEYS = [
   'id', 'label', 'emoji', 'source', 'format', 'showLabel', 'showEmoji',
@@ -63,18 +64,18 @@ export function generateConfigJson(config) {
 
 export function parseConfigJson(text) {
   const parsed = typeof text === 'string' ? JSON.parse(text) : text;
-  if (!parsed || typeof parsed !== 'object') throw new Error('Config muss ein Objekt sein.');
-  if (!Array.isArray(parsed.segments)) throw new Error('Config braucht ein segments-Array.');
+  if (!parsed || typeof parsed !== 'object') throw new Error(tt('err.notObject'));
+  if (!Array.isArray(parsed.segments)) throw new Error(tt('err.noSegments'));
 
   const segments = parsed.segments.map((segment, index) => {
     if (!segment || typeof segment !== 'object') {
-      throw new Error('Segment ' + index + ' ist kein Objekt.');
+      throw new Error(tt('err.segmentShape', { index }));
     }
     // Fall back to the catalogue entry so an abbreviated config still works.
     // Blocks are user-made and have no catalogue entry, so they carry themselves.
     const base = isBlock(segment) ? {} : (CATALOG_BY_ID[segment.id] || {});
     if (!segment.source && !base.source) {
-      throw new Error('Segment ' + (segment.id || index) + ' hat keine bekannte Quelle.');
+      throw new Error(tt('err.noSource', { id: segment.id || index }));
     }
     return { ...base, ...segment };
   });
@@ -116,7 +117,7 @@ export function extractCfgLiteral(text) {
 // Accepts a config JSON or a generated statusline.js and returns a config.
 export function parseAnyConfig(text) {
   const trimmed = String(text || '').trim();
-  if (!trimmed) throw new Error('Nichts zum Einlesen — bitte Datei wählen oder Text einfügen.');
+  if (!trimmed) throw new Error(tt('err.empty'));
 
   if (trimmed.startsWith('{')) return parseConfigJson(trimmed);
 
@@ -124,22 +125,99 @@ export function parseAnyConfig(text) {
   if (literal) return parseConfigJson(literal);
 
   if (/\bjq\b/.test(trimmed) || /^#!.*\b(bash|sh)\b/m.test(trimmed)) {
-    throw new Error(
-      'Das sieht nach einer Bash-Statusline aus. Die lässt sich nicht automatisch übernehmen — ' +
-      'bau die Segmente einmal links zusammen, danach kannst du das erzeugte statusline.js immer wieder laden.'
-    );
+    throw new Error(tt('err.bash'));
   }
-  throw new Error('Weder eine Config noch ein erzeugtes statusline.js — kein CFG-Block gefunden.');
+  throw new Error(tt('err.noCfg'));
 }
 
-function describeColor(color) {
-  if (!color) return 'keine Farbe';
-  if (color.mode === 'static') return 'fest ' + color.value;
+const PROMPT_TEXT = {
+  de: {
+    intro: 'Bitte richte meine Claude Code Statusline ein.',
+    goalHead: '## Ziel',
+    goal: path => [
+      'Ein Node-Skript unter `' + path + '`, das den Statusline-JSON-Payload von stdin liest',
+      'und die unten beschriebene Zeile ausgibt. Kein `jq`, keine Dependencies — nur Node.',
+      'Danach `~/.claude/settings.json` eintragen:'
+    ],
+    layoutHead: '## Aufbau',
+    lineCount: n => '- Zeilen: ' + n + ', jede mit eigenem Trenner (siehe unten)',
+    order: '- Segmente in genau dieser Reihenfolge:',
+    line: n => 'Zeile ' + n,
+    separator: 'Trenner',
+    dimmed: '(gedimmt)',
+    format: 'Format',
+    colour: 'Farbe',
+    emoji: 'Emoji',
+    label: 'Label',
+    noColour: 'keine Farbe',
+    fixed: 'fest',
+    thresholds: 'Schwellen',
+    gradient: 'Verlauf',
+    over: 'über',
+    literal: v => 'fester Text `' + v + '`',
+    derived: fn => 'abgeleitet über `' + fn + '`',
+    field: path => 'Feld `' + path + '`',
+    rulesHead: '## Regeln',
+    rules: [
+      '- Fehlt ein Feld im Payload, entfällt das Segment stillschweigend — niemals `null` oder leere Slots drucken.',
+      '- Segmente mit fester Quelle (`fester Text`) werden immer gedruckt, sie dienen als Blocktrenner.',
+      '- `resets_at` kann Epoch-Sekunden, Millisekunden oder ISO-String sein; alle drei abfangen.',
+      '- Es gibt nur die Buckets `rate_limits.five_hour` und `rate_limits.seven_day`.',
+      '- Farben als Truecolor (`ESC[38;2;r;g;bm`), am Ende jedes Segments zurücksetzen.',
+      '- Das ganze Rendering in try/catch; im Fehlerfall nur Modell und Verzeichnis ausgeben.'
+    ],
+    configHead: '## Fertige Konfiguration',
+    configIntro: 'Falls du sie direkt übernehmen willst — das ist exakt die Config, die mein Builder erzeugt hat:'
+  },
+
+  en: {
+    intro: 'Please set up my Claude Code status line.',
+    goalHead: '## Goal',
+    goal: path => [
+      'A Node script at `' + path + '` that reads the status line JSON payload from stdin',
+      'and prints the line described below. No `jq`, no dependencies — just Node.',
+      'Then add this to `~/.claude/settings.json`:'
+    ],
+    layoutHead: '## Layout',
+    lineCount: n => '- Lines: ' + n + ', each with its own separator (see below)',
+    order: '- Segments in exactly this order:',
+    line: n => 'Line ' + n,
+    separator: 'separator',
+    dimmed: '(dimmed)',
+    format: 'Format',
+    colour: 'Colour',
+    emoji: 'Emoji',
+    label: 'Label',
+    noColour: 'no colour',
+    fixed: 'fixed',
+    thresholds: 'thresholds',
+    gradient: 'gradient',
+    over: 'across',
+    literal: v => 'fixed text `' + v + '`',
+    derived: fn => 'derived via `' + fn + '`',
+    field: path => 'field `' + path + '`',
+    rulesHead: '## Rules',
+    rules: [
+      '- If a field is missing from the payload, drop the segment silently — never print `null` or an empty slot.',
+      '- Segments with a fixed source (`fixed text`) are always printed; they act as block dividers.',
+      '- `resets_at` may be epoch seconds, milliseconds or an ISO string; handle all three.',
+      '- There are only the buckets `rate_limits.five_hour` and `rate_limits.seven_day`.',
+      '- Colours as truecolor (`ESC[38;2;r;g;bm`), reset after every segment.',
+      '- Wrap the whole render in try/catch; on failure print only the model and the directory.'
+    ],
+    configHead: '## Finished configuration',
+    configIntro: 'If you want to take it over directly — this is exactly the config my builder produced:'
+  }
+};
+
+function describeColor(color, L) {
+  if (!color) return L.noColour;
+  if (color.mode === 'static') return L.fixed + ' ' + color.value;
   if (color.mode === 'threshold') {
-    return 'Schwellen ' + (color.stops || []).map(([at, hex]) => at + '→' + hex).join(', ');
+    return L.thresholds + ' ' + (color.stops || []).map(([at, hex]) => at + '→' + hex).join(', ');
   }
   if (color.mode === 'gradient') {
-    return 'Verlauf ' + color.from + '→' + color.to + ' über ' + color.min + '–' + color.max;
+    return L.gradient + ' ' + color.from + '→' + color.to + ' ' + L.over + ' ' + color.min + '–' + color.max;
   }
   return color.mode;
 }
@@ -153,67 +231,61 @@ function describeFormat(format) {
   return bits.join(' ');
 }
 
-function describeSource(segment) {
-  if (isBlock(segment)) return 'fester Text `' + segment.source.value + '`';
-  if (segment.source && segment.source.kind === 'derived') return 'abgeleitet über `' + segment.source.fn + '`';
-  return 'Feld `' + (segment.source ? segment.source.path : '?') + '`';
+function describeSource(segment, L) {
+  if (isBlock(segment)) return L.literal(segment.source.value);
+  if (segment.source && segment.source.kind === 'derived') return L.derived(segment.source.fn);
+  return L.field(segment.source ? segment.source.path : '?');
 }
 
 export function generatePrompt(config, opts = {}) {
   const cfg = normaliseConfig(config);
   const installPath = opts.installPath || DEFAULT_INSTALL_PATH;
+  const L = PROMPT_TEXT[opts.lang || lang()] || PROMPT_TEXT.en;
 
   const lines = [];
   for (let line = 0; line < cfg.lineCount; line++) {
     const onThisLine = cfg.segments.filter(s => (Number(s.line) || 0) === line);
     if (!onThisLine.length) continue;
     lines.push('');
-    lines.push('**Zeile ' + (line + 1) + '** — Trenner `' + cfg.separators[line] + '`' +
-      (cfg.dimSeparator ? ' (gedimmt)' : ''));
+    lines.push('**' + L.line(line + 1) + '** — ' + L.separator + ' `' + cfg.separators[line] + '`' +
+      (cfg.dimSeparator ? ' ' + L.dimmed : ''));
     onThisLine.forEach((s, i) => {
       const parts = [
         (i + 1) + '. `' + s.id + '`',
-        describeSource(s),
-        'Format: ' + describeFormat(s.format),
-        'Farbe: ' + describeColor(s.color)
+        describeSource(s, L),
+        L.format + ': ' + describeFormat(s.format),
+        L.colour + ': ' + describeColor(s.color, L)
       ];
-      if (s.showEmoji !== false && s.emoji) parts.push('Emoji: ' + s.emoji);
-      if (s.showLabel && s.label) parts.push('Label: ' + s.label);
+      if (s.showEmoji !== false && s.emoji) parts.push(L.emoji + ': ' + s.emoji);
+      if (s.showLabel && s.label) parts.push(L.label + ': ' + s.label);
       lines.push('   - ' + parts.join(' · '));
     });
   }
 
   return [
-    'Bitte richte meine Claude Code Statusline ein.',
+    L.intro,
     '',
-    '## Ziel',
+    L.goalHead,
     '',
-    'Ein Node-Skript unter `' + installPath + '`, das den Statusline-JSON-Payload von stdin liest',
-    'und die unten beschriebene Zeile ausgibt. Kein `jq`, keine Dependencies — nur Node.',
-    'Danach `~/.claude/settings.json` eintragen:',
+    ...L.goal(installPath),
     '',
     '```json',
     '"statusLine": { "type": "command", "command": "node ' + installPath + '" }',
     '```',
     '',
-    '## Aufbau',
+    L.layoutHead,
     '',
-    '- Zeilen: ' + cfg.lineCount + ', jede mit eigenem Trenner (siehe unten)',
-    '- Segmente in genau dieser Reihenfolge:',
+    L.lineCount(cfg.lineCount),
+    L.order,
     ...lines,
     '',
-    '## Regeln',
+    L.rulesHead,
     '',
-    '- Fehlt ein Feld im Payload, entfällt das Segment stillschweigend — niemals `null` oder leere Slots drucken.',
-    '- Segmente mit fester Quelle (`fester Text`) werden immer gedruckt, sie dienen als Blocktrenner.',
-    '- `resets_at` kann Epoch-Sekunden, Millisekunden oder ISO-String sein; alle drei abfangen.',
-    '- Es gibt nur die Buckets `rate_limits.five_hour` und `rate_limits.seven_day`.',
-    '- Farben als Truecolor (`ESC[38;2;r;g;bm`), am Ende jedes Segments zurücksetzen.',
-    '- Das ganze Rendering in try/catch; im Fehlerfall nur Modell und Verzeichnis ausgeben.',
+    ...L.rules,
     '',
-    '## Fertige Konfiguration',
+    L.configHead,
     '',
-    'Falls du sie direkt übernehmen willst — das ist exakt die Config, die mein Builder erzeugt hat:',
+    L.configIntro,
     '',
     '```json',
     generateConfigJson(cfg),

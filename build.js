@@ -14,11 +14,13 @@ const root = dirname(fileURLToPath(import.meta.url));
 const read = (...parts) => readFileSync(join(root, ...parts), 'utf8');
 
 export const MODULES = [
+  'i18n.js',
   'format.js',
   'derive.js',
   'color.js',
   'catalog.js',
   'render.js',
+  'cheatsheet.js',
   'runtime.js',
   'generate.js',
   'state.js',

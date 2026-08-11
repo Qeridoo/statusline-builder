@@ -9,6 +9,7 @@ import {
   parseAnyConfig, extractCfgLiteral, generateSettingsSnippet
 } from '../src/generate.js';
 import { CATALOG, CATALOG_BY_ID, REFERENCE_ORDER, makeBlock } from '../src/catalog.js';
+import { setLang } from '../src/i18n.js';
 import { renderAnsi } from '../src/render.js';
 
 const payloadText = readFileSync(new URL('../sample-payload.json', import.meta.url), 'utf8');
@@ -166,14 +167,38 @@ test('parseAnyConfig also takes a plain config json', () => {
   assert.deepEqual(back.segments.map(s => s.id), ['model']);
 });
 
+const BASH = '#!/usr/bin/env bash\ninput=$(cat)\nmodel=$(echo "$input" | jq -r .model.display_name)\n';
+
 test('parseAnyConfig explains itself when handed a bash statusline', () => {
-  const sh = '#!/usr/bin/env bash\ninput=$(cat)\nmodel=$(echo "$input" | jq -r .model.display_name)\n';
-  assert.throws(() => parseAnyConfig(sh), /Bash-Statusline/);
+  setLang('en');
+  assert.throws(() => parseAnyConfig(BASH), /bash status line/);
+  setLang('de');
+  assert.throws(() => parseAnyConfig(BASH), /Bash-Statusline/);
+  setLang('en');
 });
 
 test('parseAnyConfig rejects unrelated text and empty input', () => {
-  assert.throws(() => parseAnyConfig('guten morgen'), /CFG-Block/);
-  assert.throws(() => parseAnyConfig('   '), /Nichts zum Einlesen/);
+  setLang('en');
+  assert.throws(() => parseAnyConfig('good morning'), /CFG block/);
+  assert.throws(() => parseAnyConfig('   '), /Nothing to read/);
+});
+
+test('the prompt is written in the requested language', () => {
+  const cfg = configOf(['model', 'limit_5h']);
+  const english = generatePrompt(cfg, { lang: 'en' });
+  const german = generatePrompt(cfg, { lang: 'de' });
+
+  assert.match(english, /^Please set up my Claude Code status line\./);
+  assert.match(english, /## Rules/);
+  assert.match(german, /^Bitte richte meine Claude Code Statusline ein\./);
+  assert.match(german, /## Regeln/);
+
+  // The structural parts stay identical whichever language is chosen.
+  for (const text of [english, german]) {
+    assert.match(text, /`model`/);
+    assert.match(text, /rate_limits\.five_hour\.used_percentage/);
+    assert.match(text, /"statusLine"/);
+  }
 });
 
 test('a block survives a config round-trip without a catalogue entry', () => {

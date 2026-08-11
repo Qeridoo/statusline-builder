@@ -2,9 +2,10 @@
 
 import {
   CATALOG, CATALOG_BY_ID, GROUPS, REFERENCE_ORDER,
-  USAGE, INVERSE, MOOD_STOPS, isBlock, makeBlock, nextBlockId
+  USAGE, INVERSE, MOOD_STOPS, isBlock, makeBlock, nextBlockId, helpText
 } from './catalog.js';
-import { getState, patch, commit, subscribe } from './state.js';
+import { getState, patch, commit, subscribe, setLanguage } from './state.js';
+import { tt, lang, LANGS } from './i18n.js';
 import { renderPreview, renderExport, mountExport } from './ui-export.js';
 
 const el = (tag, props = {}, children = []) => {
@@ -22,52 +23,52 @@ const el = (tag, props = {}, children = []) => {
 
 const FORMAT_CHOICES = {
   path: [
-    { label: 'Ordnername', patch: { mode: 'basename' } },
-    { label: 'Letzte 2 Ebenen', patch: { mode: 'last2' } },
-    { label: 'Voller Pfad', patch: { mode: 'full' } },
-    { label: 'Home als ~', patch: { mode: 'tilde' } }
+    { key: 'fmt.basename', patch: { mode: 'basename' } },
+    { key: 'fmt.last2', patch: { mode: 'last2' } },
+    { key: 'fmt.full', patch: { mode: 'full' } },
+    { key: 'fmt.tilde', patch: { mode: 'tilde' } }
   ],
   percent: [
-    { label: 'ganzzahlig', patch: { decimals: 0 } },
-    { label: '1 Nachkomma', patch: { decimals: 1 } }
+    { key: 'fmt.int', patch: { decimals: 0 } },
+    { key: 'fmt.decimal1', patch: { decimals: 1 } }
   ],
   number: [
-    { label: 'gekürzt 95k', patch: { abbrev: true } },
-    { label: 'voll 95000', patch: { abbrev: false } }
+    { key: 'fmt.short', patch: { abbrev: true } },
+    { key: 'fmt.long', patch: { abbrev: false } }
   ],
   text: [
-    { label: 'voll', patch: { max: 0, slice: 0 } },
-    { label: 'max 12', patch: { max: 12, slice: 0 } },
-    { label: 'max 24', patch: { max: 24, slice: 0 } },
-    { label: 'erste 8', patch: { max: 0, slice: 8 } }
+    { key: 'fmt.textFull', patch: { max: 0, slice: 0 } },
+    { key: 'fmt.max12', patch: { max: 12, slice: 0 } },
+    { key: 'fmt.max24', patch: { max: 24, slice: 0 } },
+    { key: 'fmt.first8', patch: { max: 0, slice: 8 } }
   ],
   bool: [
-    { label: 'nur wenn an', patch: { hideWhenFalse: true } },
-    { label: 'immer zeigen', patch: { hideWhenFalse: false, offLabel: 'off' } }
+    { key: 'fmt.onlyOn', patch: { hideWhenFalse: true } },
+    { key: 'fmt.always', patch: { hideWhenFalse: false, offLabel: 'off' } }
   ],
   arrow: [
-    { label: '▼▲ ganzzahlig', patch: { decimals: 0 } },
-    { label: '▼▲ 1 Nachkomma', patch: { decimals: 1 } }
+    { key: 'fmt.arrowInt', patch: { decimals: 0 } },
+    { key: 'fmt.arrowDecimal', patch: { decimals: 1 } }
   ],
   emojiScale: [
-    { label: 'Katzen', patch: { stops: MOOD_STOPS } },
-    { label: 'Ampel', patch: { stops: [[0, '🟢'], [50, '🟡'], [75, '🟠'], [90, '🔴']] } },
-    { label: 'Wetter', patch: { stops: [[0, '☀️'], [40, '⛅'], [65, '🌧️'], [85, '⛈️']] } },
-    { label: 'Akku', patch: { stops: [[0, '🔋'], [50, '🪫']] } }
+    { key: 'fmt.cats', patch: { stops: MOOD_STOPS } },
+    { key: 'fmt.traffic', patch: { stops: [[0, '🟢'], [50, '🟡'], [75, '🟠'], [90, '🔴']] } },
+    { key: 'fmt.weather', patch: { stops: [[0, '☀️'], [40, '⛅'], [65, '🌧️'], [85, '⛈️']] } },
+    { key: 'fmt.battery', patch: { stops: [[0, '🔋'], [50, '🪫']] } }
   ],
-  countdown: [{ label: 'Restzeit', patch: {} }],
-  duration: [{ label: 'Dauer', patch: {} }],
-  currency: [{ label: 'USD', patch: {} }],
-  count: [{ label: 'Anzahl', patch: {} }],
-  raw: [{ label: 'unverändert', patch: {} }]
+  countdown: [{ key: 'fmt.countdown', patch: {} }],
+  duration: [{ key: 'fmt.duration', patch: {} }],
+  currency: [{ key: 'fmt.currency', patch: {} }],
+  count: [{ key: 'fmt.count', patch: {} }],
+  raw: [{ key: 'fmt.raw', patch: {} }]
 };
 
 const COLOR_CHOICES = [
-  { id: 'default', label: 'Standard' },
-  { id: 'usage', label: 'Ampel grün→rot' },
-  { id: 'inverse', label: 'Ampel invers' },
-  { id: 'static', label: 'Einfarbig' },
-  { id: 'gradient', label: 'Verlauf' }
+  { id: 'default', key: 'color.default' },
+  { id: 'usage', key: 'color.usage' },
+  { id: 'inverse', key: 'color.inverse' },
+  { id: 'static', key: 'color.static' },
+  { id: 'gradient', key: 'color.gradient' }
 ];
 
 const GRADIENT = { mode: 'gradient', from: '#7ec699', to: '#e06c75', min: 0, max: 100 };
@@ -121,6 +122,64 @@ const select = (options, selected, onChange) => {
   return node;
 };
 
+// ---- tooltips ----
+//
+// One shared node, positioned under whatever is hovered or focused. Native
+// title attributes would do the job but arrive after a delay and cannot carry
+// the source path on its own line.
+
+let tipNode = null;
+
+function tooltip() {
+  if (!tipNode) {
+    tipNode = el('div', { class: 'tip', role: 'tooltip' });
+    tipNode.hidden = true;
+    document.body.appendChild(tipNode);
+  }
+  return tipNode;
+}
+
+export function sourceLabel(segment) {
+  if (!segment || !segment.source) return '';
+  if (segment.source.kind === 'literal') return tt('tip.literal');
+  if (segment.source.kind === 'derived') return tt('tip.derived', { fn: segment.source.fn });
+  return segment.source.path;
+}
+
+function positionTip(node, target) {
+  if (!target.getBoundingClientRect) return;
+  const rect = target.getBoundingClientRect();
+  const own = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+  const width = (own && own.width) || 260;
+  const viewport = (typeof window !== 'undefined' && window.innerWidth) || 1200;
+  node.style.left = Math.round(Math.max(10, Math.min(viewport - width - 10, rect.left))) + 'px';
+  node.style.top = Math.round(rect.bottom + 8) + 'px';
+}
+
+function showTip(target, segment) {
+  const help = helpText(segment, lang());
+  const source = sourceLabel(segment);
+  if (!help && !source) return;
+  const node = tooltip();
+  const children = [el('div', { class: 'tip__title', text: segment.label || segment.id })];
+  if (help) children.push(el('div', { class: 'tip__body', text: help }));
+  if (source) children.push(el('div', { class: 'tip__src', text: source }));
+  node.replaceChildren(...children);
+  node.hidden = false;
+  positionTip(node, target);
+}
+
+function hideTip() {
+  if (tipNode) tipNode.hidden = true;
+}
+
+function attachTip(target, segment) {
+  target.addEventListener('mouseenter', () => showTip(target, segment));
+  target.addEventListener('mouseleave', hideTip);
+  target.addEventListener('focus', () => showTip(target, segment));
+  target.addEventListener('blur', hideTip);
+}
+
 export function mount() {
   const dom = {
     preview: document.getElementById('preview'),
@@ -142,6 +201,11 @@ export function mount() {
     loadControls: document.getElementById('load-controls'),
     loadFile: document.getElementById('load-file'),
     loadFileName: document.getElementById('load-file-name'),
+    cheatPanel: document.getElementById('cheat-panel'),
+    cheatPreview: document.getElementById('cheat-preview'),
+    cheatPng: document.getElementById('cheat-png'),
+    cheatSvg: document.getElementById('cheat-svg'),
+    cheatCopy: document.getElementById('cheat-copy'),
     installPath: document.getElementById('install-path'),
     installCommand: document.getElementById('install-command'),
     verifyCommand: document.getElementById('verify-command'),
@@ -149,6 +213,7 @@ export function mount() {
     copyScript: document.getElementById('copy-script'),
     copyCommand: document.getElementById('copy-command'),
     osButtons: Array.from(document.querySelectorAll('.os')),
+    langButtons: Array.from(document.querySelectorAll('.lang')),
     snippet: document.getElementById('settings-snippet'),
     sliders: [
       ['ctx', document.getElementById('pv-ctx'), document.getElementById('pv-ctx-out')],
@@ -163,11 +228,20 @@ export function mount() {
   };
 
   const rebuild = () => {
+    applyStaticStrings(dom);
     renderSeparators(dom);
     renderCatalog(dom, rebuild);
     renderRows(dom, rebuild);
     refresh();
   };
+
+  dom.langButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      setLanguage(button.dataset.lang);
+      hideTip();
+      rebuild();
+    });
+  });
 
   dom.dimSeparator.addEventListener('change', () => patch({ dimSeparator: dom.dimSeparator.checked }));
 
@@ -216,6 +290,28 @@ export function mount() {
   rebuild();
 }
 
+// Swaps the strings that live in the template rather than in JavaScript. The
+// markup is authored in English, so a failure here degrades to English rather
+// than to empty labels.
+function applyStaticStrings(dom) {
+  const each = (selector, apply) => {
+    const nodes = document.querySelectorAll ? document.querySelectorAll(selector) : [];
+    for (const node of nodes) apply(node);
+  };
+
+  each('[data-i18n]', node => { node.textContent = tt(node.getAttribute('data-i18n')); });
+  each('[data-i18n-html]', node => { node.innerHTML = tt(node.getAttribute('data-i18n-html')); });
+  each('[data-i18n-aria]', node => { node.setAttribute('aria-label', tt(node.getAttribute('data-i18n-aria'))); });
+
+  const current = lang();
+  dom.langButtons.forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.lang === current));
+  });
+  if (document.documentElement && document.documentElement.setAttribute) {
+    document.documentElement.setAttribute('lang', current);
+  }
+}
+
 function applySort(mode) {
   const state = getState();
   const segments = state.segments.slice();
@@ -248,12 +344,16 @@ function renderSeparators(dom) {
   for (let i = 0; i < state.lineCount; i++) {
     const index = i;
     dom.separators.appendChild(el('label', { class: 'sep-field' }, [
-      el('span', { text: state.lineCount > 1 ? 'Trenner Zeile ' + (index + 1) : 'Trenner' }),
+      el('span', {
+        text: state.lineCount > 1
+          ? tt('field.separatorLine', { n: index + 1 })
+          : tt('field.separator')
+      }),
       el('input', {
         type: 'text',
         list: 'sep-presets',
         value: state.separators[index],
-        'aria-label': 'Trenner für Zeile ' + (index + 1),
+        'aria-label': tt('field.separatorLine', { n: index + 1 }),
         oninput: event => {
           getState().separators[index] = event.target.value;
           if (index === 0) getState().separator = event.target.value;
@@ -276,13 +376,11 @@ function renderCatalog(dom, rebuild) {
     const list = el('div', { class: 'group__list' });
     for (const segment of members) {
       const on = active.has(segment.id);
-      list.appendChild(el('button', {
+      const chip = el('button', {
         class: 'chip',
         type: 'button',
         'aria-pressed': String(on),
-        title: segment.source.kind === 'derived'
-          ? 'berechnet: ' + segment.source.fn
-          : segment.source.path,
+        'data-help': helpText(segment, lang()),
         onclick: () => {
           const current = getState();
           const next = active.has(segment.id)
@@ -294,13 +392,15 @@ function renderCatalog(dom, rebuild) {
       }, [
         segment.emoji ? el('span', { class: 'chip__emoji', text: segment.emoji }) : null,
         el('span', { text: segment.label })
-      ]));
+      ]);
+      attachTip(chip, segment);
+      list.appendChild(chip);
     }
 
     dom.catalog.appendChild(el('div', { class: 'group' }, [
       el('div', { class: 'group__head' }, [
         el('span', { text: group.emoji }),
-        el('span', { text: group.label })
+        el('span', { text: tt('group.' + group.id) })
       ]),
       list
     ]));
@@ -312,7 +412,7 @@ function renderRows(dom, rebuild) {
   dom.rows.replaceChildren();
 
   if (!state.segments.length) {
-    dom.rows.appendChild(el('p', { class: 'empty', text: 'Noch nichts ausgewählt — links Segmente antippen.' }));
+    dom.rows.appendChild(el('p', { class: 'empty', text: tt('builder.empty') }));
     return;
   }
 
@@ -334,7 +434,7 @@ function renderRows(dom, rebuild) {
       class: 'row__swatch',
       type: 'color',
       value: (segment.color || {}).mode === 'static' ? (segment.color.value || '#c8ccd4') : '#c8ccd4',
-      'aria-label': 'Farbe für ' + segment.id,
+      'aria-label': tt('row.colorAria', { id: segment.id }),
       oninput: event => {
         segment.color = { mode: 'static', value: event.target.value };
         commit();
@@ -348,8 +448,8 @@ function renderRows(dom, rebuild) {
           class: 'row__block',
           type: 'text',
           value: segment.source.value,
-          placeholder: 'Blocktext',
-          'aria-label': 'Text des Blocks',
+          placeholder: tt('row.blockPlaceholder'),
+          'aria-label': tt('row.blockAria'),
           oninput: event => {
             segment.source = { kind: 'literal', value: event.target.value };
             commit();
@@ -357,7 +457,7 @@ function renderRows(dom, rebuild) {
         })
       : (choices.length > 1
           ? select(
-              choices.map((choice, i) => ({ value: String(i), label: choice.label })),
+              choices.map((choice, i) => ({ value: String(i), label: tt(choice.key) })),
               String(activeFormatChoice(segment)),
               value => {
                 segment.format = { ...segment.format, ...choices[Number(value)].patch };
@@ -371,8 +471,8 @@ function renderRows(dom, rebuild) {
       type: 'text',
       maxlength: '18',
       value: segment.showLabel ? (segment.label || '') : '',
-      placeholder: block ? '—' : (catalogueLabel || 'Label'),
-      'aria-label': 'Label für ' + segment.id,
+      placeholder: block ? '—' : (catalogueLabel || tt('row.labelPlaceholder')),
+      'aria-label': tt('row.labelAria', { id: segment.id }),
       oninput: event => {
         const text = event.target.value;
         segment.showLabel = text.length > 0;
@@ -382,13 +482,19 @@ function renderRows(dom, rebuild) {
     });
     if (block) labelInput.disabled = true;
 
+    const name = el('div', {
+      class: 'row__name',
+      tabindex: '0',
+      'data-help': helpText(segment, lang())
+    }, [
+      el('span', { class: 'row__id', text: segment.id }),
+      el('span', { class: 'row__group', text: block ? tt('group.block') : tt('group.' + segment.group) })
+    ]);
+    attachTip(name, segment);
+
     const row = el('div', { class: 'row', draggable: 'true' }, [
       el('span', { class: 'row__grip', text: '⠿', 'aria-hidden': 'true' }),
-
-      el('div', { class: 'row__name' }, [
-        el('span', { class: 'row__id', text: segment.id, title: segment.id }),
-        el('span', { class: 'row__group', text: block ? 'Block' : segment.group })
-      ]),
+      name,
 
       el('input', {
         class: 'row__emoji',
@@ -396,7 +502,7 @@ function renderRows(dom, rebuild) {
         maxlength: '4',
         value: segment.emoji || '',
         placeholder: '–',
-        'aria-label': 'Emoji für ' + segment.id,
+        'aria-label': tt('row.emojiAria', { id: segment.id }),
         oninput: event => {
           segment.emoji = event.target.value;
           segment.showEmoji = event.target.value.length > 0;
@@ -407,7 +513,7 @@ function renderRows(dom, rebuild) {
       contentCell,
 
       select(
-        COLOR_CHOICES.map(choice => ({ value: choice.id, label: choice.label })),
+        COLOR_CHOICES.map(choice => ({ value: choice.id, label: tt(choice.key) })),
         colorId,
         value => {
           segment.color = colorFor(value, segment);
@@ -418,7 +524,7 @@ function renderRows(dom, rebuild) {
       ),
 
       select(
-        Array.from({ length: state.lineCount }, (_, i) => ({ value: String(i), label: 'Zeile ' + (i + 1) })),
+        Array.from({ length: state.lineCount }, (_, i) => ({ value: String(i), label: tt('row.line', { n: i + 1 }) })),
         String(Math.min(segment.line || 0, state.lineCount - 1)),
         value => {
           segment.line = Number(value);
@@ -431,15 +537,15 @@ function renderRows(dom, rebuild) {
 
       el('div', { class: 'row__toggle' }, [
         el('button', {
-          class: 'icon-btn', type: 'button', title: 'nach oben',
+          class: 'icon-btn', type: 'button', title: tt('row.up'),
           onclick: () => move(index, index - 1)
         }, [el('span', { text: '↑' })]),
         el('button', {
-          class: 'icon-btn', type: 'button', title: 'nach unten',
+          class: 'icon-btn', type: 'button', title: tt('row.down'),
           onclick: () => move(index, index + 1)
         }, [el('span', { text: '↓' })]),
         el('button', {
-          class: 'icon-btn icon-btn--danger', type: 'button', title: 'entfernen',
+          class: 'icon-btn icon-btn--danger', type: 'button', title: tt('row.remove'),
           onclick: () => {
             patch({ segments: getState().segments.filter((_, i) => i !== index), sort: 'manual' });
             rebuild();

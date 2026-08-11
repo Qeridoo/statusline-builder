@@ -245,6 +245,128 @@ export const CATALOG = [
   seg('agent_type', 'status', 'type', '🧩', path('agent_type'), { type: 'text' }, MUTED, { hideValues: ['main'] })
 ];
 
+// One sentence per segment, saying what the number means rather than where it
+// comes from. Shown as a tooltip in the builder and as the caption on the
+// cheatsheet, so it has to stay short enough to wrap into two narrow lines.
+export const HELP = {
+  session_name: 'Name der Session, wie mit /rename vergeben. Ohne Namen bleibt das Segment leer.',
+  session_id: 'Die ersten 8 Zeichen der Session-UUID — nützlich, um Transcripts wiederzufinden.',
+  permission_mode: 'Aktueller Berechtigungsmodus. Wird ausgeblendet, solange er auf default steht.',
+  output_style: 'Gewählter Output-Style. Wird ausgeblendet, solange er auf default steht.',
+  remote: 'Kennung der Remote-Session, wenn die Arbeit in der Cloud läuft.',
+
+  model: 'Das Modell, das gerade antwortet.',
+  model_id: 'Die vollständige Modell-ID inklusive Varianten-Suffix wie [1m].',
+  effort: 'Reasoning-Effort von low bis max. Höher heißt gründlicher und langsamer.',
+  fast_mode: 'Zeigt an, dass Fast Mode aktiv ist — gleiches Modell, schnellere Ausgabe.',
+  thinking: 'Zeigt an, dass erweitertes Nachdenken eingeschaltet ist.',
+  version: 'Version von Claude Code.',
+
+  project_dir: 'Das Projektverzeichnis, in dem die Session gestartet wurde.',
+  current_dir: 'Das Verzeichnis, in dem gerade gearbeitet wird — kann vom Projekt abweichen.',
+  git_worktree: 'Der ausgecheckte Git-Branch des Arbeitsverzeichnisses.',
+  repo: 'Name des Git-Repositories.',
+  worktree_name: 'Name des isolierten Worktrees, wenn mit --worktree gearbeitet wird.',
+  worktree_branch: 'Branch innerhalb des isolierten Worktrees.',
+  added_dirs: 'Anzahl zusätzlich freigegebener Verzeichnisse außerhalb des Projekts.',
+  pr: 'Nummer des Pull Requests, an dem diese Session hängt.',
+
+  ctx_used: 'Wie voll das Kontextfenster dieses Chats ist. Setzt sich mit /clear zurück.',
+  ctx_remaining: 'Wie viel vom Kontextfenster noch frei ist — Gegenstück zu ctx.',
+  ctx_left_tokens: 'Verbleibender Kontext in Tokens statt in Prozent.',
+  ctx_window_size: 'Gesamtgröße des Kontextfensters dieses Modells.',
+  tokens_in: 'Summe aller Eingabe-Tokens dieser Session, inklusive Cache.',
+  tokens_out: 'Summe aller Ausgabe-Tokens dieser Session.',
+  tokens_cache_read: 'Aus dem Prompt-Cache gelesene Tokens — die sind deutlich billiger.',
+  exceeds_200k: 'Meldet, dass die Session über 200k Tokens hinaus ist.',
+
+  limit_5h: 'Verbrauch im laufenden 5-Stunden-Fenster. Kommt vom Server, wie /usage.',
+  limit_5h_reset: 'Countdown bis das 5-Stunden-Fenster zurückgesetzt wird.',
+  limit_7d: 'Verbrauch im laufenden Wochenfenster. Kommt vom Server, wie /usage.',
+  limit_7d_reset: 'Countdown bis das Wochenfenster zurückgesetzt wird.',
+
+  cost_usd: 'Bisherige Kosten dieser Session in US-Dollar.',
+  duration: 'Wanduhr-Zeit seit Beginn der Session.',
+  api_duration: 'Reine API-Zeit — der Anteil, in dem tatsächlich gerechnet wurde.',
+  lines_added: 'In dieser Session hinzugefügte Codezeilen.',
+  lines_removed: 'In dieser Session entfernte Codezeilen.',
+  lines_delta: 'Hinzugefügte und entfernte Zeilen dieser Session in einem Segment.',
+
+  weekly_today_left: 'Wie viel vom heutigen Anteil am Wochenlimit noch übrig ist. 0 heißt: für heute aufgebraucht, negativ heißt: du greifst auf morgen vor.',
+  weekly_pace: 'Wie viel Prozent pro Tag du ab jetzt verbrauchen darfst, um das Wochenlimit gerade zu erreichen.',
+  weekly_even_burn: 'Abstand zur gleichmäßigen Verbrauchslinie. ▼ heißt unter Plan, ▲ heißt du bist vor dem Reset am Limit.',
+  mood: 'Fasst den schlechtesten der drei Messwerte — Kontext, 5h, 7d — in einem Emoji zusammen.',
+
+  vim_mode: 'Aktueller Vim-Modus, wenn die Vim-Eingabe eingeschaltet ist.',
+  agent_name: 'Name des Subagenten, der diese Zeile rendert.',
+  agent_type: 'Typ des Agenten. Wird ausgeblendet, solange es der Hauptagent ist.'
+};
+
+export const HELP_EN = {
+  session_name: 'Name of the session, as set with /rename. Without one the segment stays empty.',
+  session_id: 'The first 8 characters of the session UUID — handy for finding transcripts.',
+  permission_mode: 'The current permission mode. Hidden while it sits at default.',
+  output_style: 'The chosen output style. Hidden while it sits at default.',
+  remote: 'Identifier of the remote session when the work runs in the cloud.',
+
+  model: 'The model that is answering right now.',
+  model_id: 'The full model id including variant suffixes such as [1m].',
+  effort: 'Reasoning effort from low to max. Higher means more thorough and slower.',
+  fast_mode: 'Shows that fast mode is on — same model, faster output.',
+  thinking: 'Shows that extended thinking is switched on.',
+  version: 'The version of Claude Code.',
+
+  project_dir: 'The project directory the session was started in.',
+  current_dir: 'The directory being worked in, which can differ from the project.',
+  git_worktree: 'The git branch checked out in the working directory.',
+  repo: 'Name of the git repository.',
+  worktree_name: 'Name of the isolated worktree when running with --worktree.',
+  worktree_branch: 'Branch inside the isolated worktree.',
+  added_dirs: 'How many extra directories outside the project were made available.',
+  pr: 'Number of the pull request this session is attached to.',
+
+  ctx_used: 'How full this chat’s context window is. Resets with /clear.',
+  ctx_remaining: 'How much of the context window is still free — the counterpart to ctx.',
+  ctx_left_tokens: 'Remaining context in tokens rather than per cent.',
+  ctx_window_size: 'Total size of this model’s context window.',
+  tokens_in: 'All input tokens of this session, cache included.',
+  tokens_out: 'All output tokens of this session.',
+  tokens_cache_read: 'Tokens served from the prompt cache — those are far cheaper.',
+  exceeds_200k: 'Flags that the session has passed 200k tokens.',
+
+  limit_5h: 'Usage inside the running 5-hour window. Server-side, same as /usage.',
+  limit_5h_reset: 'Countdown until the 5-hour window resets.',
+  limit_7d: 'Usage inside the running weekly window. Server-side, same as /usage.',
+  limit_7d_reset: 'Countdown until the weekly window resets.',
+
+  cost_usd: 'What this session has cost so far, in US dollars.',
+  duration: 'Wall-clock time since the session started.',
+  api_duration: 'API time only — the share actually spent computing.',
+  lines_added: 'Lines of code added in this session.',
+  lines_removed: 'Lines of code removed in this session.',
+  lines_delta: 'Lines added and removed in this session, in one segment.',
+
+  weekly_today_left: 'How much of today’s share of the weekly limit is left. 0 means done for today, negative means you are eating into tomorrow.',
+  weekly_pace: 'How many per cent per day you may spend from now on to just reach the weekly limit.',
+  weekly_even_burn: 'Distance from an even burn line. ▼ means under plan, ▲ means you will cap before the reset.',
+  mood: 'Folds the worst of the three meters — context, 5h, 7d — into a single emoji.',
+
+  vim_mode: 'The current vim mode when vim input is switched on.',
+  agent_name: 'Name of the subagent rendering this line.',
+  agent_type: 'Type of agent. Hidden while it is the main one.'
+};
+
+for (const segment of CATALOG) {
+  segment.help = { de: HELP[segment.id] || '', en: HELP_EN[segment.id] || '' };
+}
+
+export function helpText(segment, lang) {
+  const help = segment && segment.help;
+  if (!help) return '';
+  if (typeof help === 'string') return help;
+  return help[lang] || help.en || help.de || '';
+}
+
 export const CATALOG_BY_ID = CATALOG.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
 
 // Free-text blocks. They are not part of the catalogue — the user creates them —

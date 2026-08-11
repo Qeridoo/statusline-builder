@@ -5,10 +5,14 @@
   <div class="proof__inner">
     <div class="proof__head">
       <h1 class="proof__title">Statusline Builder</h1>
-      <span class="proof__sub">Claude Code &middot; Payload-Schema 2.1.227</span>
+      <span class="proof__sub" data-i18n="app.subtitle">Claude Code · payload schema 2.1.227</span>
       <span class="proof__spacer"></span>
+      <div class="os-switch lang-switch" role="group" aria-label="Language">
+        <button class="lang" type="button" data-lang="en">EN</button>
+        <button class="lang" type="button" data-lang="de">DE</button>
+      </div>
       <label class="field">
-        <span>Zeilen</span>
+        <span data-i18n="field.lines">Lines</span>
         <select id="line-count">
           <option value="1">1</option>
           <option value="2">2</option>
@@ -17,17 +21,17 @@
       </label>
       <label class="field">
         <input type="checkbox" id="dim-separator" />
-        <span>Trenner gedimmt</span>
+        <span data-i18n="field.dim">Dim separator</span>
       </label>
     </div>
 
-    <div class="terminal" id="preview" aria-live="polite" aria-label="Vorschau der Statusline"></div>
+    <div class="terminal" id="preview" aria-live="polite" data-i18n-aria="preview.aria" aria-label="Status line preview"></div>
 
     <div class="toolbar">
       <div class="seps" id="separators"></div>
       <span class="proof__spacer"></span>
       <label class="slider">
-        <span>Kontext</span>
+        <span data-i18n="slider.context">Context</span>
         <input type="range" id="pv-ctx" min="0" max="100" step="1" />
         <output id="pv-ctx-out"></output>
       </label>
@@ -58,63 +62,73 @@
 <main class="shell">
   <section class="panel panel--catalog">
     <div class="panel__head">
-      <h2 class="panel__title">Segmente</h2>
+      <h2 class="panel__title" data-i18n="panel.segments">Segments</h2>
       <span class="panel__spacer"></span>
-      <button class="icon-btn" id="clear-all" type="button">alle aus</button>
+      <button class="icon-btn" id="clear-all" type="button" data-i18n="action.clearAll">clear all</button>
     </div>
     <div class="panel__body" id="catalog"></div>
   </section>
 
   <section class="panel panel--builder">
     <div class="panel__head">
-      <h2 class="panel__title">Reihenfolge &amp; Darstellung</h2>
+      <h2 class="panel__title" data-i18n="panel.builder">Order &amp; display</h2>
       <span class="panel__spacer"></span>
-      <button class="btn btn--small" id="add-block" type="button">+ Block</button>
+      <button class="btn btn--small" id="add-block" type="button" data-i18n="action.addBlock">+ Block</button>
       <label class="field">
-        <span>Sortierung</span>
+        <span data-i18n="field.sort">Sort</span>
         <select id="sort">
-          <option value="manual">manuell</option>
-          <option value="reference">Referenz-Layout</option>
-          <option value="group">nach Gruppe</option>
-          <option value="alpha">alphabetisch</option>
+          <option value="manual" data-i18n="sort.manual">manual</option>
+          <option value="reference" data-i18n="sort.reference">reference layout</option>
+          <option value="group" data-i18n="sort.group">by group</option>
+          <option value="alpha" data-i18n="sort.alpha">alphabetical</option>
         </select>
       </label>
     </div>
     <div class="panel__body">
       <div class="rows" id="rows"></div>
-      <p class="hint" id="builder-hint">Emoji und Label leer lassen heißt: wird nicht angezeigt. Ein Block ist freier Text, der immer erscheint — praktisch als Gruppentrenner.</p>
+      <p class="hint" id="builder-hint" data-i18n="builder.hint"></p>
     </div>
   </section>
 
   <section class="panel panel--export">
     <div class="panel__head">
-      <h2 class="panel__title">Übergabe</h2>
+      <h2 class="panel__title" data-i18n="panel.export">Handover</h2>
       <span class="panel__spacer"></span>
       <div class="tabs" role="tablist">
-        <button class="tab" type="button" role="tab" data-tab="script">statusline.js</button>
-        <button class="tab" type="button" role="tab" data-tab="prompt">Prompt</button>
-        <button class="tab" type="button" role="tab" data-tab="config">Config</button>
-        <button class="tab" type="button" role="tab" data-tab="load">Laden</button>
+        <button class="tab" type="button" role="tab" data-tab="script" data-i18n="tab.script">statusline.js</button>
+        <button class="tab" type="button" role="tab" data-tab="prompt" data-i18n="tab.prompt">Prompt</button>
+        <button class="tab" type="button" role="tab" data-tab="config" data-i18n="tab.config">Config</button>
+        <button class="tab" type="button" role="tab" data-tab="cheat" data-i18n="tab.cheat">Cheat sheet</button>
+        <button class="tab" type="button" role="tab" data-tab="load" data-i18n="tab.load">Load</button>
       </div>
     </div>
     <div class="panel__body">
       <div class="load-controls" id="load-controls" hidden>
-        <label class="btn" for="load-file">Datei wählen …</label>
+        <label class="btn" for="load-file" data-i18n="action.chooseFile">Choose file …</label>
         <input type="file" id="load-file" accept=".js,.json,.txt,application/json,text/javascript" />
         <span id="load-file-name" class="hint"></span>
       </div>
+      <div class="cheat" id="cheat-panel" hidden>
+        <div class="cheat__frame" id="cheat-preview"></div>
+        <div class="actions">
+          <button class="btn btn--primary" type="button" id="cheat-png" data-i18n="cheat.png">Download PNG</button>
+          <button class="btn" type="button" id="cheat-svg" data-i18n="cheat.svg">Download SVG</button>
+          <button class="btn" type="button" id="cheat-copy" data-i18n="cheat.copy">Copy SVG</button>
+        </div>
+      </div>
       <textarea class="code" id="export-out" spellcheck="false" aria-label="Export"></textarea>
       <div class="actions">
-        <button class="btn btn--primary" type="button" id="copy">Kopieren</button>
-        <button class="btn" type="button" id="download">Herunterladen</button>
-        <button class="btn btn--primary" type="button" id="import" hidden>Übernehmen</button>
+        <button class="btn btn--primary" type="button" id="copy" data-i18n="action.copy">Copy</button>
+        <button class="btn" type="button" id="download" data-i18n="action.download">Download</button>
+        <button class="btn btn--primary" type="button" id="import" hidden data-i18n="action.import">Apply</button>
       </div>
       <p class="hint" id="export-hint"></p>
+
       <div class="install">
         <div class="install__top">
-          <h3 class="panel__title">Installation</h3>
+          <h3 class="panel__title" data-i18n="install.title">Install</h3>
           <span class="panel__spacer"></span>
-          <div class="os-switch" role="group" aria-label="Betriebssystem">
+          <div class="os-switch" role="group" aria-label="Operating system">
             <button class="os" type="button" data-os="windows">Windows</button>
             <button class="os" type="button" data-os="macos">macOS</button>
             <button class="os" type="button" data-os="linux">Linux</button>
@@ -122,23 +136,23 @@
         </div>
 
         <label class="field control install__path">
-          <span>Zielpfad</span>
+          <span data-i18n="install.path">Target path</span>
           <input type="text" id="install-path" spellcheck="false" />
         </label>
 
-        <p class="hint"><b>1.</b> Skript in die Zwischenablage. Der Knopf nimmt immer den Inhalt von <code>statusline.js</code> — unabhängig davon, welcher Tab oben offen ist.</p>
-        <button class="btn btn--primary install__btn" type="button" id="copy-script">Skript kopieren</button>
+        <p class="hint" data-i18n-html="install.step1"></p>
+        <button class="btn btn--primary install__btn" type="button" id="copy-script" data-i18n="install.copyScript">Copy script</button>
 
-        <p class="hint"><b>2.</b> Zwischenablage in die Datei schreiben, in <span id="shell-name">PowerShell</span>:</p>
-        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="Befehl zum Speichern"></textarea>
-        <button class="btn btn--small install__btn" type="button" id="copy-command">Befehl kopieren</button>
+        <p class="hint"><span data-i18n-html="install.step2"></span> <span id="shell-name">PowerShell</span>:</p>
+        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="Command"></textarea>
+        <button class="btn btn--small install__btn" type="button" id="copy-command" data-i18n="install.copyCommand">Copy command</button>
 
-        <p class="hint"><b>3.</b> In <code>~/.claude/settings.json</code> eintragen:</p>
-        <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
-        <p class="hint hint--warn">Der Befehl muss mit <code>node</code> beginnen. Kommst du von einer <code>statusline.sh</code>, steht dort noch <code>bash</code> — dann läuft weiter das alte Skript und die Leiste bleibt leer. Die <code>.sh</code> selbst kann liegen bleiben.</p>
+        <p class="hint" data-i18n-html="install.step3"></p>
+        <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json snippet"></textarea>
+        <p class="hint hint--warn" data-i18n-html="install.warn"></p>
 
-        <p class="hint"><b>4.</b> Gegenprobe — die erste Zeile der Datei muss <code>#!/usr/bin/env node</code> sein. Steht dort <code>{</code>, wurde versehentlich der <b>Config</b>-Tab kopiert statt <b>statusline.js</b>:</p>
-        <textarea class="code code--line" id="verify-command" spellcheck="false" readonly aria-label="Befehl zum Prüfen"></textarea>
+        <p class="hint" data-i18n-html="install.step4"></p>
+        <textarea class="code code--line" id="verify-command" spellcheck="false" readonly aria-label="Verify command"></textarea>
       </div>
     </div>
   </section>

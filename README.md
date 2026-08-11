@@ -1,34 +1,46 @@
 # Statusline Builder
 
-A single-page tool for composing a Claude Code status line — pick segments, order
-them, style them, and export a runnable script, a handover prompt for Claude, or a
-config file you can read back in later.
+**English** · [Deutsch](README.de.md)
 
-Open `index.html` by double-clicking it. There is no build step, no server, and no
-network access: everything is inlined into that one file.
+Compose a Claude Code status line in the browser: pick segments, order them, style
+them, and export a runnable script, a handover prompt for Claude, or a config you
+can read back in later. The interface is available in English and German.
+
+**[Open the builder →](https://qeridoo.github.io/statusline-builder/)**
+
+![The builder](docs/media/builder.png)
+
+Or open `index.html` by double-clicking it. There is no build step, no server, and
+no network access: everything is inlined into that one file.
 
 ## Composing a line
 
 - **Labels** — every row has a label field. Leave it empty and nothing is printed;
-  type into it and that exact text is used, so `ctx` can become `kontext` or `k`.
+  type into it and that exact text is used, so `ctx` can become `context` or `c`.
   The emoji field behaves the same way: empty means no emoji.
 - **Blocks** — `+ Block` adds a segment that is just free text. Unlike a real
   segment it always prints, so it works as a fixed divider between groups. Drag it
   wherever you want the break.
 - **Separators per line** — each line has its own separator field, with the common
   ones offered as suggestions and anything else accepted as free text.
-- **Loading an existing line** — the **Laden** tab reads a `statusline.js` this tool
+- **Tooltips** — hovering or focusing a segment explains what its number means and
+  which payload field it comes from.
+- **Loading an existing line** — the **Load** tab reads a `statusline.js` this tool
   generated (it pulls the `CFG` block back out) or a saved config JSON, from a paste
   or a file. A hand-written bash status line cannot be imported; the app says so
   rather than failing quietly.
 
 Everything is kept in `localStorage`, so the page reopens where you left it.
 
-### If Herunterladen does nothing
+## The cheat sheet
 
-The published artifact runs inside a sandboxed iframe, and some browsers block
-downloads there. Use **Kopieren** instead, or open `index.html` locally where the
-download works normally.
+The **Cheat sheet** tab renders your line with a caption on every segment, as an SVG
+or PNG to keep or share.
+
+![The cheat sheet](docs/media/cheatsheet.png)
+
+Callouts alternate above and below the line and are packed into as few rows as fit
+without overlapping, so the layout holds whether you run five segments or fifteen.
 
 ## Why Node and not jq
 
@@ -49,8 +61,8 @@ The generated script is plain Node with no dependencies. Measured on Windows 11:
 The app's install block walks through this with the right commands for your
 platform; pick Windows, macOS or Linux at its top. The steps are:
 
-**1. Copy the script.** Use the **Skript kopieren** button in the install block, not
-the copy button above the tabs. It always takes the generated script, whichever tab
+**1. Copy the script.** Use the **Copy script** button in the install block, not the
+copy button above the tabs. It always takes the generated script, whichever tab
 happens to be open — copying the **Config** tab by mistake writes a JSON file that
 Node cannot run.
 
@@ -85,14 +97,14 @@ running and the line stays blank. The `.sh` itself can stay where it is — once
 **4. Check it.** The first line of the file must be `#!/usr/bin/env node`:
 
 ```bash
-head -1 ~/.claude/statusline.js                                  # macOS, Linux
+head -1 ~/.claude/statusline.js                                   # macOS, Linux
 Get-Content "C:\Users\<you>\.claude\statusline.js" -TotalCount 1  # Windows
 ```
 
 A leading `{` means the Config tab was copied instead of the script.
 
 Everything configurable in the generated file lives in the `CFG` object at the top,
-so it stays editable by hand — and the **Laden** tab reads it back in.
+so it stays editable by hand — and the **Load** tab reads it back in.
 
 ## The payload
 
@@ -153,7 +165,7 @@ number to trust for the week as a whole.
 ## Development
 
 ```bash
-npm test        # node --test — 108 tests
+npm test        # node --test — 142 tests
 node build.js   # regenerates index.html from src/
 ./test.sh path/to/statusline.js   # pipes sample-payload.json through a generated script
 ```
@@ -162,13 +174,15 @@ Source layout:
 
 | File | Responsibility |
 |---|---|
+| `src/i18n.js` | every interface string, in English and German |
 | `src/format.js` | value formatters; every one returns `null` for input it cannot show |
 | `src/derive.js` | the weekly burn maths |
 | `src/color.js` | static, threshold and gradient colours, plus ANSI wrapping |
-| `src/catalog.js` | the segment catalogue — all 44 segments as data |
+| `src/catalog.js` | the segment catalogue — all 44 segments as data, with explanations |
 | `src/render.js` | config plus payload to terminal output or preview markup |
+| `src/cheatsheet.js` | callout layout and the annotated SVG |
 | `src/runtime.js` | the standalone engine that ships inside the generated script |
-| `src/generate.js` | the three export formats |
+| `src/generate.js` | the export formats and the readers that undo them |
 | `src/state.js` | one state object, persisted to `localStorage` |
 | `src/ui.js`, `src/ui-export.js` | catalogue, builder rows, preview, export panel |
 | `build.js` | strips imports and exports, concatenates into `index.html` |
@@ -185,3 +199,16 @@ other fails the suite.
 
 The generated script honours `SL_NOW` (epoch milliseconds) so those comparisons are
 reproducible.
+
+### Testing the interface without a browser
+
+`test/ui-smoke.test.js` runs the built bundle against a small DOM shim in `node:vm`.
+The element ids come from `index.template.html` rather than a hand-kept list, so a
+typo in either file makes `getElementById` return `null` and `mount()` throw.
+
+That shim checks behaviour, not rendering — it happily reports an element as hidden
+when CSS would still show it. Layout, overlap and visibility need a real browser.
+
+## Licence
+
+MIT
