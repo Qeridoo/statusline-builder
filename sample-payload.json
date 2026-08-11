@@ -1,0 +1,50 @@
+{
+  "session_id": "986fc58a-95ca-4c34-8a6e-c95eec5ec0bb",
+  "session_name": "statusline-builder",
+  "transcript_path": "C:/Users/marku/.claude/projects/statusline/986fc58a.jsonl",
+  "cwd": "C:/Users/marku/.cursor/Claude Code/statusline",
+  "prompt_id": "p_01H9",
+  "permission_mode": "default",
+  "agent_id": "main",
+  "agent_type": "main",
+  "effort": { "level": "high" },
+  "model": { "id": "claude-opus-5[1m]", "display_name": "Opus 5" },
+  "workspace": {
+    "current_dir": "C:/Users/marku/.cursor/Claude Code/statusline",
+    "project_dir": "C:/Users/marku/.cursor/Claude Code",
+    "added_dirs": [],
+    "git_worktree": "feat/statusline-builder",
+    "repo": "statusline"
+  },
+  "version": "2.1.227",
+  "output_style": { "name": "default" },
+  "cost": {
+    "total_cost_usd": 1.2345,
+    "total_duration_ms": 905000,
+    "total_api_duration_ms": 412000,
+    "total_lines_added": 503,
+    "total_lines_removed": 16
+  },
+  "context_window": {
+    "total_input_tokens": 184000,
+    "total_output_tokens": 9100,
+    "context_window_size": 1000000,
+    "current_usage": {
+      "input_tokens": 95000,
+      "output_tokens": 1200,
+      "cache_creation_input_tokens": 4000,
+      "cache_read_input_tokens": 85000
+    },
+    "used_percentage": 10.4,
+    "remaining_percentage": 89.6
+  },
+  "exceeds_200k_tokens": false,
+  "fast_mode": false,
+  "thinking": { "enabled": true },
+  "rate_limits": {
+    "five_hour": { "used_percentage": 1.2, "resets_at": 1786460040 },
+    "seven_day": { "used_percentage": 32.4, "resets_at": 1786788000 }
+  },
+  "vim": { "mode": "INSERT" },
+  "agent": { "name": "main" }
+}

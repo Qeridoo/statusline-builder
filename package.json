@@ -1,0 +1,11 @@
+{
+  "name": "statusline-builder",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Compose a Claude Code status line and export a runnable script",
+  "scripts": {
+    "test": "node --test",
+    "build": "node build.js"
+  }
+}
