@@ -1,0 +1,2327 @@
+<title>Claude Code Statusline Builder</title>
+<style>
+/* Light is the base palette. Dark redefines only tokens, in both the
+   un-stamped (prefers-color-scheme) and the explicitly stamped state. */
+:root {
+  --ground: #f4f3f7;
+  --surface: #ffffff;
+  --surface-2: #eceaf1;
+  --line: #dcd9e4;
+  --line-strong: #c3bfd0;
+  --ink: #1a1922;
+  --ink-2: #4a4757;
+  --muted: #6f6b80;
+  --accent: #6d3fe0;
+  --accent-soft: #ede7fd;
+  --accent-ink: #ffffff;
+  --term-bg: #16151d;
+  --term-ink: #d8d5e4;
+  --danger: #b3261e;
+
+  --radius: 8px;
+  --gap: 14px;
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", ui-monospace, Consolas, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #131219;
+    --surface: #1b1a23;
+    --surface-2: #232230;
+    --line: #302e3d;
+    --line-strong: #45425a;
+    --ink: #e7e4f0;
+    --ink-2: #b6b2c6;
+    --muted: #8b869c;
+    --accent: #a882ff;
+    --accent-soft: #2a2140;
+    --accent-ink: #16121f;
+    --term-bg: #0e0d14;
+    --term-ink: #d8d5e4;
+    --danger: #f2837c;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #131219;
+  --surface: #1b1a23;
+  --surface-2: #232230;
+  --line: #302e3d;
+  --line-strong: #45425a;
+  --ink: #e7e4f0;
+  --ink-2: #b6b2c6;
+  --muted: #8b869c;
+  --accent: #a882ff;
+  --accent-soft: #2a2140;
+  --accent-ink: #16121f;
+  --term-bg: #0e0d14;
+  --term-ink: #d8d5e4;
+  --danger: #f2837c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+
+button, select, input, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- proof bar ---------- */
+
+.proof {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.proof__inner {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 14px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.proof__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.proof__title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.proof__sub {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.proof__spacer { flex: 1 1 auto; }
+
+.terminal {
+  background: var(--term-bg);
+  color: var(--term-ink);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  padding: 13px 16px;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.75;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.terminal:empty::before {
+  content: "Kein Segment aktiv — links etwas auswählen.";
+  color: #6b6880;
+}
+
+.sl-sep { color: #5d5a71; }
+
+/* ---------- toolbar ---------- */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.field > span { white-space: nowrap; }
+
+.slider {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.slider input[type="range"] { width: 96px; accent-color: var(--accent); }
+
+.slider output {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  min-width: 34px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- layout ---------- */
+
+.shell {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 18px 20px 56px;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr) 400px;
+  gap: var(--gap);
+  align-items: start;
+}
+
+@media (max-width: 1240px) {
+  .shell { grid-template-columns: 240px minmax(0, 1fr); }
+  .panel--export { grid-column: 1 / -1; }
+}
+
+@media (max-width: 820px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .panel--export { grid-column: auto; }
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.panel__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.panel__spacer { flex: 1 1 auto; }
+
+.panel__body { padding: 12px 14px 16px; }
+
+.panel--catalog .panel__body {
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+}
+
+/* ---------- catalogue ---------- */
+
+.group + .group { margin-top: 16px; }
+
+.group__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+.group__list { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background-color .12s, border-color .12s, color .12s;
+}
+
+.chip:hover { border-color: var(--accent); color: var(--ink); }
+
+.chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.chip__emoji { font-size: 12px; }
+
+/* ---------- builder ---------- */
+
+.rows { display: flex; flex-direction: column; gap: 7px; }
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(104px, 1.1fr) auto repeat(3, minmax(80px, 1fr)) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.row--dragging { opacity: .45; }
+.row--over { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.row__grip {
+  cursor: grab;
+  color: var(--muted);
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+  user-select: none;
+}
+
+.row__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.row__id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row__group {
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.row__emoji {
+  width: 46px;
+  text-align: center;
+  padding: 4px 2px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+
+.row select,
+.control select,
+.control input[type="text"],
+.control input[type="number"] {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+
+.row__swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+}
+
+.row__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.icon-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 5px;
+  padding: 2px 6px;
+  line-height: 1.2;
+}
+
+.icon-btn:hover { color: var(--ink); background: var(--surface-2); }
+.icon-btn--danger:hover { color: var(--danger); }
+
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 18px 4px;
+  text-align: center;
+}
+
+/* ---------- export ---------- */
+
+.tabs { display: flex; gap: 4px; }
+
+.tab {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tab:hover { color: var(--ink); }
+
+.tab[aria-selected="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.code {
+  width: 100%;
+  min-height: 300px;
+  max-height: 46vh;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  tab-size: 2;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--ink);
+  white-space: pre;
+  overflow: auto;
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+
+.btn {
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink);
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.btn:hover { border-color: var(--accent); }
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.hint code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--surface-2);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.install {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+
+<header class="proof">
+  <div class="proof__inner">
+    <div class="proof__head">
+      <h1 class="proof__title">Statusline Builder</h1>
+      <span class="proof__sub">Claude Code &middot; Payload-Schema 2.1.227</span>
+      <span class="proof__spacer"></span>
+      <label class="field">
+        <span>Trenner</span>
+        <select id="separator">
+          <option value=" | ">Pipe&nbsp;&nbsp;|</option>
+          <option value=" · ">Punkt&nbsp;&nbsp;·</option>
+          <option value=" ▸ ">Pfeil&nbsp;&nbsp;▸</option>
+          <option value="  ">Leerraum</option>
+          <option value=" • ">Bullet&nbsp;&nbsp;•</option>
+          <option value=" ┃ ">Balken&nbsp;&nbsp;┃</option>
+        </select>
+      </label>
+      <label class="field">
+        <input type="checkbox" id="dim-separator" />
+        <span>gedimmt</span>
+      </label>
+      <label class="field">
+        <span>Zeilen</span>
+        <select id="line-count">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="terminal" id="preview" aria-live="polite" aria-label="Vorschau der Statusline"></div>
+
+    <div class="toolbar">
+      <label class="slider">
+        <span>Kontext</span>
+        <input type="range" id="pv-ctx" min="0" max="100" step="1" />
+        <output id="pv-ctx-out"></output>
+      </label>
+      <label class="slider">
+        <span>5h-Limit</span>
+        <input type="range" id="pv-5h" min="0" max="100" step="1" />
+        <output id="pv-5h-out"></output>
+      </label>
+      <label class="slider">
+        <span>7d-Limit</span>
+        <input type="range" id="pv-7d" min="0" max="100" step="1" />
+        <output id="pv-7d-out"></output>
+      </label>
+      <span class="proof__spacer"></span>
+      <span class="slider" id="derived-readout"></span>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+  <section class="panel panel--catalog">
+    <div class="panel__head">
+      <h2 class="panel__title">Segmente</h2>
+      <span class="panel__spacer"></span>
+      <button class="icon-btn" id="clear-all" type="button">alle aus</button>
+    </div>
+    <div class="panel__body" id="catalog"></div>
+  </section>
+
+  <section class="panel panel--builder">
+    <div class="panel__head">
+      <h2 class="panel__title">Reihenfolge &amp; Darstellung</h2>
+      <span class="panel__spacer"></span>
+      <label class="field">
+        <span>Sortierung</span>
+        <select id="sort">
+          <option value="manual">manuell</option>
+          <option value="reference">Referenz-Layout</option>
+          <option value="group">nach Gruppe</option>
+          <option value="alpha">alphabetisch</option>
+        </select>
+      </label>
+    </div>
+    <div class="panel__body">
+      <div class="rows" id="rows"></div>
+    </div>
+  </section>
+
+  <section class="panel panel--export">
+    <div class="panel__head">
+      <h2 class="panel__title">Übergabe</h2>
+      <span class="panel__spacer"></span>
+      <div class="tabs" role="tablist">
+        <button class="tab" type="button" role="tab" data-tab="script">statusline.js</button>
+        <button class="tab" type="button" role="tab" data-tab="prompt">Prompt für Claude</button>
+        <button class="tab" type="button" role="tab" data-tab="config">Config</button>
+      </div>
+    </div>
+    <div class="panel__body">
+      <textarea class="code" id="export-out" spellcheck="false" aria-label="Export"></textarea>
+      <div class="actions">
+        <button class="btn btn--primary" type="button" id="copy">Kopieren</button>
+        <button class="btn" type="button" id="download">Herunterladen</button>
+        <button class="btn" type="button" id="import" hidden>Config übernehmen</button>
+      </div>
+      <p class="hint" id="export-hint"></p>
+      <div class="install">
+        <label class="field control" style="flex-direction:column;align-items:stretch;gap:5px">
+          <span>Zielpfad</span>
+          <input type="text" id="install-path" spellcheck="false" />
+        </label>
+        <textarea class="code" id="settings-snippet" style="min-height:96px" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
+        <p class="hint">Kommt in <code>~/.claude/settings.json</code>. Kein <code>jq</code> nötig — nur Node.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+// Generated by build.js. Edit the files in src/ instead of this bundle.
+
+const SAMPLE_PAYLOAD = {
+  "session_id": "986fc58a-95ca-4c34-8a6e-c95eec5ec0bb",
+  "session_name": "statusline-builder",
+  "transcript_path": "C:/Users/marku/.claude/projects/statusline/986fc58a.jsonl",
+  "cwd": "C:/Users/marku/.cursor/Claude Code/statusline",
+  "prompt_id": "p_01H9",
+  "permission_mode": "default",
+  "agent_id": "main",
+  "agent_type": "main",
+  "effort": { "level": "high" },
+  "model": { "id": "claude-opus-5[1m]", "display_name": "Opus 5" },
+  "workspace": {
+    "current_dir": "C:/Users/marku/.cursor/Claude Code/statusline",
+    "project_dir": "C:/Users/marku/.cursor/Claude Code",
+    "added_dirs": [],
+    "git_worktree": "feat/statusline-builder",
+    "repo": "statusline"
+  },
+  "version": "2.1.227",
+  "output_style": { "name": "default" },
+  "cost": {
+    "total_cost_usd": 1.2345,
+    "total_duration_ms": 905000,
+    "total_api_duration_ms": 412000,
+    "total_lines_added": 503,
+    "total_lines_removed": 16
+  },
+  "context_window": {
+    "total_input_tokens": 184000,
+    "total_output_tokens": 9100,
+    "context_window_size": 1000000,
+    "current_usage": {
+      "input_tokens": 95000,
+      "output_tokens": 1200,
+      "cache_creation_input_tokens": 4000,
+      "cache_read_input_tokens": 85000
+    },
+    "used_percentage": 10.4,
+    "remaining_percentage": 89.6
+  },
+  "exceeds_200k_tokens": false,
+  "fast_mode": false,
+  "thinking": { "enabled": true },
+  "rate_limits": {
+    "five_hour": { "used_percentage": 1.2, "resets_at": 1786460040 },
+    "seven_day": { "used_percentage": 32.4, "resets_at": 1786788000 }
+  },
+  "vim": { "mode": "INSERT" },
+  "agent": { "name": "main" }
+};
+
+// ---------- src/format.js ----------
+// Value formatters shared by the builder preview and the generated status line.
+// Every formatter returns null for input it cannot represent, so callers can
+// drop the segment instead of printing a blank slot.
+
+function parseResetsAt(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    // Below 1e11 the value cannot plausibly be milliseconds since the epoch.
+    return v < 1e11 ? Math.round(v * 1000) : Math.round(v);
+  }
+  if (typeof v === 'string') {
+    const trimmed = v.trim();
+    if (/^\d+$/.test(trimmed)) return parseResetsAt(Number(trimmed));
+    const parsed = Date.parse(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function fmtPercent(n, opts = {}) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  const { decimals = 0, sign = false } = opts;
+  const prefix = sign && v > 0 ? '+' : '';
+  return prefix + v.toFixed(decimals) + '%';
+}
+
+function fmtNumber(n, opts = {}) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  if (opts.abbrev === false) return String(Math.round(v));
+  const abs = Math.abs(v);
+  const [divisor, suffix] = abs >= 1e6 ? [1e6, 'M'] : abs >= 1e3 ? [1e3, 'k'] : [1, ''];
+  const scaled = v / divisor;
+  const decimals = suffix && Math.abs(scaled) < 10 ? 1 : 0;
+  return scaled.toFixed(decimals) + suffix;
+}
+
+function fmtDuration(ms) {
+  const v = Number(ms);
+  if (!Number.isFinite(v) || v < 0) return null;
+  const totalMinutes = Math.floor(v / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return days + 'd' + hours + 'h';
+  if (hours > 0) return hours + 'h' + String(minutes).padStart(2, '0') + 'm';
+  return minutes + 'm';
+}
+
+// Takes milliseconds. Callers run parseResetsAt first.
+function fmtCountdown(resetsAtMs, nowMs) {
+  const target = Number(resetsAtMs);
+  const now = Number(nowMs);
+  if (!Number.isFinite(target) || !Number.isFinite(now)) return null;
+  return target - now <= 0 ? 'now' : fmtDuration(target - now);
+}
+
+function fmtCurrency(usd) {
+  const v = Number(usd);
+  return Number.isFinite(v) ? '$' + v.toFixed(2) : null;
+}
+
+function fmtPath(p, opts = {}) {
+  if (typeof p !== 'string' || p === '') return null;
+  const { mode = 'basename' } = opts;
+  if (mode === 'full') return p;
+  const normalised = p.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (mode === 'tilde') {
+    return normalised.replace(/^(?:[A-Za-z]:)?\/(?:Users|home)\/[^/]+/, '~');
+  }
+  const parts = normalised.split('/').filter(Boolean);
+  if (!parts.length) return normalised;
+  if (mode === 'last2') return parts.slice(-2).join('/');
+  return parts[parts.length - 1];
+}
+
+function fmtText(s, opts = {}) {
+  if (s === null || s === undefined) return null;
+  const str = String(s);
+  const max = Number(opts.max) || 0;
+  if (!max || str.length <= max) return str;
+  return str.slice(0, max - 1) + '…';
+}
+
+function fmtBool(v, opts = {}) {
+  if (v === null || v === undefined) return null;
+  const { onLabel = 'on', offLabel = '', hideWhenFalse = true } = opts;
+  if (!v) return hideWhenFalse ? null : offLabel;
+  return onLabel;
+}
+
+// ---------- src/derive.js ----------
+// Metrics that are not present in the payload and have to be computed from the
+// weekly rate-limit bucket. All of them return null when the bucket is absent.
+
+
+const WINDOW_MS = 7 * 24 * 3600 * 1000;
+
+function weeklyWindow(payload, now) {
+  const bucket = payload && payload.rate_limits && payload.rate_limits.seven_day;
+  if (!bucket) return null;
+  const resetsAt = parseResetsAt(bucket.resets_at);
+  const used = Number(bucket.used_percentage);
+  if (resetsAt === null || !Number.isFinite(used)) return null;
+  const start = resetsAt - WINDOW_MS;
+  const elapsedFraction = Math.min(1, Math.max(0, (now - start) / WINDOW_MS));
+  // Floor at one hour so pace never divides by zero right before the reset.
+  const daysLeft = Math.max((resetsAt - now) / 86400000, 1 / 24);
+  return { used, resetsAt, elapsedFraction, daysLeft };
+}
+
+// Signed percentage points away from a perfectly even burn.
+// Negative means under the line, positive means ahead of it.
+function evenBurn(payload, now) {
+  const w = weeklyWindow(payload, now);
+  return w ? w.used - w.elapsedFraction * 100 : null;
+}
+
+// Percent of the weekly allowance that can be spent per day from now on.
+function pace(payload, now) {
+  const w = weeklyWindow(payload, now);
+  return w ? (100 - w.used) / w.daysLeft : null;
+}
+
+// Percent of today's slice still available. Capped at a full slice, but allowed
+// to go negative: below zero means today is eating into tomorrow.
+//
+// This is stateless and therefore an approximation. It assumes usage before
+// today tracked the even-burn line, because the payload carries no history.
+function todayLeft(payload, now) {
+  const w = weeklyWindow(payload, now);
+  if (!w) return null;
+  const slice = 100 / 7;
+  const dayIndex = Math.floor(w.elapsedFraction * 7);
+  const usedToday = w.used - dayIndex * slice;
+  return Math.min(100, ((slice - usedToday) / slice) * 100);
+}
+
+// The worst of the three meters, so a single emoji can stand in for all of them.
+function worstMeter(payload) {
+  const candidates = [
+    payload && payload.context_window && payload.context_window.used_percentage,
+    payload && payload.rate_limits && payload.rate_limits.five_hour && payload.rate_limits.five_hour.used_percentage,
+    payload && payload.rate_limits && payload.rate_limits.seven_day && payload.rate_limits.seven_day.used_percentage
+  ].map(Number).filter(Number.isFinite);
+  return candidates.length ? Math.max(...candidates) : null;
+}
+
+function mood(payload) {
+  return worstMeter(payload);
+}
+
+// ---------- src/color.js ----------
+// Colour resolution and ANSI wrapping. Truecolor throughout — every terminal
+// Claude Code runs in supports it.
+
+const ESC = String.fromCharCode(27);
+
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex === null || hex === undefined ? '' : hex).trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex(rgb) {
+  const channel = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return '#' + rgb.map(channel).join('');
+}
+
+function resolveColor(spec, value) {
+  if (!spec || typeof spec !== 'object') return null;
+  if (spec.mode === 'static') return spec.value || null;
+
+  const v = Number(value);
+
+  if (spec.mode === 'threshold') {
+    const stops = (spec.stops || []).slice().sort((a, b) => a[0] - b[0]);
+    if (!stops.length) return null;
+    if (!Number.isFinite(v)) return stops[0][1];
+    let picked = stops[0][1];
+    for (const [at, hex] of stops) if (v >= at) picked = hex;
+    return picked;
+  }
+
+  if (spec.mode === 'gradient') {
+    const from = hexToRgb(spec.from);
+    const to = hexToRgb(spec.to);
+    if (!from || !to) return null;
+    const min = Number(spec.min === undefined ? 0 : spec.min);
+    const max = Number(spec.max === undefined ? 100 : spec.max);
+    const t = max === min ? 0 : Math.min(1, Math.max(0, (v - min) / (max - min)));
+    return rgbToHex(from.map((c, i) => c + (to[i] - c) * t));
+  }
+
+  return null;
+}
+
+function hexToAnsi(hex) {
+  const rgb = hexToRgb(hex);
+  return rgb ? '38;2;' + rgb.join(';') : null;
+}
+
+function ansiWrap(text, hex, opts = {}) {
+  const codes = [];
+  if (opts.bold) codes.push('1');
+  if (opts.dim) codes.push('2');
+  const colour = hexToAnsi(hex);
+  if (colour) codes.push(colour);
+  if (!codes.length) return text;
+  return ESC + '[' + codes.join(';') + 'm' + text + ESC + '[0m';
+}
+
+// ---------- src/catalog.js ----------
+// The segment catalogue. Everything the builder offers is data in this file —
+// the renderer and the code generator stay generic.
+
+
+const GROUPS = [
+  { id: 'session', label: 'Session', emoji: '🪪' },
+  { id: 'model', label: 'Modell', emoji: '🤖' },
+  { id: 'workspace', label: 'Workspace', emoji: '📁' },
+  { id: 'context', label: 'Kontext', emoji: '🧠' },
+  { id: 'limits', label: 'Limits', emoji: '⏱️' },
+  { id: 'cost', label: 'Kosten', emoji: '💰' },
+  { id: 'derived', label: 'Abgeleitet', emoji: '📈' },
+  { id: 'status', label: 'Status', emoji: '🚦' }
+];
+
+// Shared colour presets. "usage" goes green to red as a meter fills, "inverse"
+// is for values where more is better.
+const USAGE = {
+  mode: 'threshold',
+  stops: [[0, '#7ec699'], [50, '#e0c46c'], [75, '#e5a95f'], [90, '#e06c75']]
+};
+const INVERSE = {
+  mode: 'threshold',
+  stops: [[0, '#e06c75'], [25, '#e5a95f'], [50, '#e0c46c'], [75, '#7ec699']]
+};
+const BURN = {
+  mode: 'threshold',
+  stops: [[-100, '#7ec699'], [0, '#e0c46c'], [10, '#e06c75']]
+};
+const plain = value => ({ mode: 'static', value });
+
+const TEXT = plain('#c8ccd4');
+const MUTED = plain('#8a90a0');
+const ACCENT = plain('#a78bfa');
+const GREEN = plain('#7ec699');
+const RED = plain('#e06c75');
+const BLUE = plain('#6cb6ff');
+
+const MOOD_STOPS = [[0, '😺'], [30, '😼'], [50, '🙀'], [70, '😾']];
+
+const EFFORT_SCALE = { low: 0, medium: 30, high: 60, xhigh: 80, max: 100 };
+
+// Derived values. Each receives the whole payload and may return a number,
+// a string, or null.
+const DERIVED = {
+  todayLeft: (p, now) => todayLeft(p, now),
+  pace: (p, now) => pace(p, now),
+  evenBurn: (p, now) => evenBurn(p, now),
+  mood: p => mood(p),
+  linesDelta: p => {
+    const added = Number(p && p.cost && p.cost.total_lines_added);
+    const removed = Number(p && p.cost && p.cost.total_lines_removed);
+    if (!Number.isFinite(added) && !Number.isFinite(removed)) return null;
+    return '+' + (Number.isFinite(added) ? added : 0) + '/-' + (Number.isFinite(removed) ? removed : 0);
+  },
+  contextLeftTokens: p => {
+    const size = Number(p && p.context_window && p.context_window.context_window_size);
+    const pct = Number(p && p.context_window && p.context_window.remaining_percentage);
+    if (!Number.isFinite(size) || !Number.isFinite(pct)) return null;
+    return (size * pct) / 100;
+  }
+};
+
+function getPath(obj, path) {
+  if (!obj || !path) return null;
+  let cur = obj;
+  for (const key of path.split('.')) {
+    if (cur === null || cur === undefined || typeof cur !== 'object') return null;
+    cur = cur[key];
+  }
+  return cur === undefined ? null : cur;
+}
+
+function applyFormat(raw, format, now) {
+  const f = format || {};
+  const type = f.type || 'text';
+  let out = null;
+
+  switch (type) {
+    case 'raw':
+      out = raw === null || raw === undefined ? null : String(raw);
+      break;
+    case 'path':
+      out = fmtPath(raw, { mode: f.mode || 'basename' });
+      break;
+    case 'percent':
+      out = fmtPercent(raw, f);
+      break;
+    case 'number':
+      out = fmtNumber(raw, f);
+      break;
+    case 'duration':
+      out = fmtDuration(raw);
+      break;
+    case 'countdown':
+      out = fmtCountdown(parseResetsAt(raw), now);
+      break;
+    case 'currency':
+      out = fmtCurrency(raw);
+      break;
+    case 'bool':
+      out = fmtBool(raw, f);
+      break;
+    case 'count': {
+      const n = Array.isArray(raw) ? raw.length : Number(raw);
+      out = Number.isFinite(n) && n > 0 ? String(n) : null;
+      break;
+    }
+    case 'arrow': {
+      const v = Number(raw);
+      if (!Number.isFinite(v)) break;
+      const arrow = v < -0.5 ? '▼' : v > 0.5 ? '▲' : '▬';
+      out = arrow + Math.abs(v).toFixed(f.decimals || 0);
+      break;
+    }
+    case 'emojiScale': {
+      const v = Number(raw);
+      if (!Number.isFinite(v)) break;
+      const stops = (f.stops || MOOD_STOPS).slice().sort((a, b) => a[0] - b[0]);
+      out = stops[0][1];
+      for (const [at, emoji] of stops) if (v >= at) out = emoji;
+      break;
+    }
+    default: {
+      let s = raw === null || raw === undefined ? null : String(raw);
+      if (s !== null && f.slice) s = s.slice(0, f.slice);
+      out = s === null ? null : fmtText(s, { max: f.max });
+    }
+  }
+
+  if (out === null || out === undefined || out === '') return null;
+  if (f.prefix) out = f.prefix + out;
+  if (f.suffix) out = out + f.suffix;
+  return out;
+}
+
+function getValue(segment, payload, now) {
+  if (!segment || !segment.source) return null;
+  const at = now === undefined ? Date.now() : now;
+  let raw = null;
+
+  try {
+    if (segment.source.kind === 'derived') {
+      const fn = DERIVED[segment.source.fn];
+      raw = fn ? fn(payload, at) : null;
+    } else {
+      raw = getPath(payload, segment.source.path);
+    }
+  } catch {
+    return null;
+  }
+
+  if (raw === null || raw === undefined) return null;
+  if (segment.hideValues && segment.hideValues.indexOf(String(raw)) !== -1) return null;
+
+  const display = applyFormat(raw, segment.format, at);
+  if (display === null) return null;
+
+  let colorValue = Number(raw);
+  if (!Number.isFinite(colorValue)) {
+    const scale = segment.scaleMap;
+    colorValue = scale && scale[String(raw)] !== undefined ? scale[String(raw)] : null;
+  }
+  return { raw, display, colorValue };
+}
+
+const seg = (id, group, label, emoji, source, format, color, extra) => ({
+  id, group, label, emoji, source, format,
+  color: color || TEXT,
+  showLabel: false,
+  showEmoji: true,
+  line: 0,
+  hideWhen: 'empty',
+  ...(extra || {})
+});
+const path = p => ({ kind: 'path', path: p });
+const derived = fn => ({ kind: 'derived', fn });
+
+const CATALOG = [
+  // session
+  seg('session_name', 'session', 'session', '🏷️', path('session_name'), { type: 'text', max: 24 }, ACCENT),
+  seg('session_id', 'session', 'id', '🆔', path('session_id'), { type: 'text', slice: 8 }, MUTED),
+  seg('permission_mode', 'session', 'mode', '🛡️', path('permission_mode'), { type: 'text' }, MUTED, { hideValues: ['default'] }),
+  seg('output_style', 'session', 'style', '🎨', path('output_style.name'), { type: 'text' }, MUTED, { hideValues: ['default'] }),
+  seg('remote', 'session', 'remote', '🛰️', path('remote.session_id'), { type: 'text', slice: 8 }, MUTED),
+
+  // model
+  seg('model', 'model', 'model', '🦄', path('model.display_name'), { type: 'text' }, ACCENT),
+  seg('model_id', 'model', 'id', '🔖', path('model.id'), { type: 'text' }, MUTED),
+  seg('effort', 'model', 'effort', '🎚️', path('effort.level'), { type: 'text' }, USAGE, { scaleMap: EFFORT_SCALE }),
+  seg('fast_mode', 'model', 'fast', '⚡', path('fast_mode'), { type: 'bool', onLabel: 'fast' }, plain('#e0c46c')),
+  seg('thinking', 'model', 'think', '💭', path('thinking.enabled'), { type: 'bool', onLabel: 'think' }, MUTED),
+  seg('version', 'model', 'version', '🏷', path('version'), { type: 'text', prefix: 'v' }, MUTED),
+
+  // workspace
+  seg('project_dir', 'workspace', 'project', '📁', path('workspace.project_dir'), { type: 'path', mode: 'basename' }, BLUE),
+  seg('current_dir', 'workspace', 'dir', '📂', path('workspace.current_dir'), { type: 'path', mode: 'basename' }, TEXT),
+  seg('git_worktree', 'workspace', 'branch', '🌿', path('workspace.git_worktree'), { type: 'text', max: 28 }, GREEN),
+  seg('repo', 'workspace', 'repo', '📦', path('workspace.repo'), { type: 'text' }, TEXT),
+  seg('worktree_name', 'workspace', 'worktree', '🌳', path('worktree.name'), { type: 'text' }, GREEN),
+  seg('worktree_branch', 'workspace', 'wt-branch', '🌿', path('worktree.branch'), { type: 'text' }, GREEN),
+  seg('added_dirs', 'workspace', 'added', '➕', path('workspace.added_dirs'), { type: 'count', prefix: '+' }, MUTED),
+  seg('pr', 'workspace', 'pr', '🔀', path('pr.number'), { type: 'raw', prefix: '#' }, BLUE),
+
+  // context
+  seg('ctx_used', 'context', 'ctx', '🧠', path('context_window.used_percentage'), { type: 'percent', decimals: 0 }, USAGE),
+  seg('ctx_remaining', 'context', 'left', '🧠', path('context_window.remaining_percentage'), { type: 'percent', decimals: 0 }, INVERSE),
+  seg('ctx_left_tokens', 'context', 'left', '🧠', derived('contextLeftTokens'), { type: 'number' }, MUTED),
+  seg('ctx_window_size', 'context', 'window', '🪟', path('context_window.context_window_size'), { type: 'number' }, MUTED),
+  seg('tokens_in', 'context', 'in', '↑', path('context_window.total_input_tokens'), { type: 'number' }, MUTED, { showEmoji: true }),
+  seg('tokens_out', 'context', 'out', '↓', path('context_window.total_output_tokens'), { type: 'number' }, MUTED),
+  seg('tokens_cache_read', 'context', 'cache', '♻️', path('context_window.current_usage.cache_read_input_tokens'), { type: 'number' }, MUTED),
+  seg('exceeds_200k', 'context', 'big', '📈', path('exceeds_200k_tokens'), { type: 'bool', onLabel: '200k+' }, plain('#e0c46c')),
+
+  // limits
+  seg('limit_5h', 'limits', '5h', '🔥', path('rate_limits.five_hour.used_percentage'), { type: 'percent', decimals: 0 }, USAGE),
+  seg('limit_5h_reset', 'limits', '5h reset', '⏳', path('rate_limits.five_hour.resets_at'), { type: 'countdown' }, MUTED),
+  seg('limit_7d', 'limits', '7d', '🎯', path('rate_limits.seven_day.used_percentage'), { type: 'percent', decimals: 0 }, USAGE),
+  seg('limit_7d_reset', 'limits', '7d reset', '📅', path('rate_limits.seven_day.resets_at'), { type: 'countdown' }, MUTED),
+
+  // cost
+  seg('cost_usd', 'cost', 'cost', '💰', path('cost.total_cost_usd'), { type: 'currency' }, plain('#e0c46c')),
+  seg('duration', 'cost', 'time', '⏲️', path('cost.total_duration_ms'), { type: 'duration' }, MUTED),
+  seg('api_duration', 'cost', 'api', '🛜', path('cost.total_api_duration_ms'), { type: 'duration' }, MUTED),
+  seg('lines_added', 'cost', 'added', '➕', path('cost.total_lines_added'), { type: 'number', prefix: '+' }, GREEN),
+  seg('lines_removed', 'cost', 'removed', '➖', path('cost.total_lines_removed'), { type: 'number', prefix: '-' }, RED),
+  seg('lines_delta', 'cost', 'lines', '📝', derived('linesDelta'), { type: 'raw' }, GREEN),
+
+  // derived
+  seg('weekly_today_left', 'derived', 'today', '📆', derived('todayLeft'), { type: 'percent', decimals: 0, suffix: 't' }, INVERSE),
+  seg('weekly_pace', 'derived', 'pace', '🏃', derived('pace'), { type: 'percent', decimals: 0, suffix: '/d' }, INVERSE),
+  seg('weekly_even_burn', 'derived', 'burn', '', derived('evenBurn'), { type: 'arrow', decimals: 0 }, BURN, { showEmoji: false }),
+  seg('mood', 'derived', 'mood', '', derived('mood'), { type: 'emojiScale', stops: MOOD_STOPS }, MUTED, { showEmoji: false }),
+
+  // status
+  seg('vim_mode', 'status', 'vim', '⌨️', path('vim.mode'), { type: 'text' }, MUTED),
+  seg('agent_name', 'status', 'agent', '🕵️', path('agent.name'), { type: 'text' }, MUTED),
+  seg('agent_type', 'status', 'type', '🧩', path('agent_type'), { type: 'text' }, MUTED, { hideValues: ['main'] })
+];
+
+const CATALOG_BY_ID = CATALOG.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
+
+// The layout from the reference screenshot, used by the "reference" sort option
+// and as the default configuration.
+const REFERENCE_ORDER = [
+  'model', 'effort', 'limit_7d', 'weekly_today_left', 'weekly_pace', 'weekly_even_burn',
+  'ctx_used', 'lines_delta', 'limit_5h', 'limit_5h_reset', 'mood'
+];
+
+// ---------- src/render.js ----------
+// Turns a config plus a payload into either terminal output or preview markup.
+// Both renderers share buildLines so the preview cannot drift from the real thing.
+
+
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+const escapeHtml = s => String(s).replace(/[&<>"]/g, c => HTML_ESCAPES[c]);
+
+// Config can arrive from an imported JSON file, so a colour is only ever
+// interpolated into markup after it has been checked.
+const safeHex = hex => (/^#[0-9a-f]{6}$/i.test(String(hex)) ? String(hex) : null);
+
+function segmentText(segment, value) {
+  const pieces = [];
+  if (segment.showEmoji !== false && segment.emoji) pieces.push(segment.emoji);
+  if (segment.showLabel && segment.label) pieces.push(segment.label + ':');
+  pieces.push(value.display);
+  return pieces.join(' ');
+}
+
+function buildLines(config, payload, now) {
+  const lineCount = Math.max(1, Math.min(3, Number(config.lineCount) || 1));
+  const lines = [];
+  for (let i = 0; i < lineCount; i++) lines.push([]);
+
+  for (const segment of config.segments || []) {
+    const value = getValue(segment, payload, now);
+    if (!value) continue;
+    const index = Math.min(lineCount - 1, Math.max(0, Number(segment.line) || 0));
+    lines[index].push({
+      segment,
+      value,
+      text: segmentText(segment, value),
+      hex: safeHex(resolveColor(segment.color, value.colorValue))
+    });
+  }
+  return lines.filter(parts => parts.length > 0);
+}
+
+function renderAnsi(config, payload, now) {
+  const at = now === undefined ? Date.now() : now;
+  const separator = config.separator === undefined ? ' | ' : config.separator;
+  const joiner = ansiWrap(separator, null, { dim: config.dimSeparator !== false });
+  return buildLines(config, payload, at)
+    .map(parts => parts
+      .map(p => ansiWrap(p.text, p.hex, { bold: p.segment.bold, dim: p.segment.dim }))
+      .join(joiner))
+    .join('\n');
+}
+
+function renderHtml(config, payload, now) {
+  const at = now === undefined ? Date.now() : now;
+  const separator = config.separator === undefined ? ' | ' : config.separator;
+  const joiner = '<span class="sl-sep">' + escapeHtml(separator).replace(/ /g, '&nbsp;') + '</span>';
+  return buildLines(config, payload, at)
+    .map(parts => parts
+      .map(p => {
+        const styles = [];
+        if (p.hex) styles.push('color:' + p.hex);
+        if (p.segment.bold) styles.push('font-weight:700');
+        if (p.segment.dim) styles.push('opacity:.6');
+        const attr = styles.length ? ' style="' + styles.join(';') + '"' : '';
+        return '<span class="sl-seg"' + attr + '>' + escapeHtml(p.text) + '</span>';
+      })
+      .join(joiner))
+    .join('<br>');
+}
+
+// ---------- src/runtime.js ----------
+// The engine that ships inside the generated statusline.js.
+//
+// It deliberately repeats the logic of format.js, derive.js, color.js and
+// render.js instead of importing them: the generated file lives in ~/.claude and
+// must stand alone. test/generate.test.js renders the same config through both
+// paths and asserts byte equality, so the two cannot drift apart unnoticed.
+//
+// Constraints for anything written inside this string: no backticks and no
+// dollar-brace sequences, because the whole body is a raw template literal.
+
+const RUNTIME_SOURCE = String.raw`
+'use strict';
+
+const ESC = String.fromCharCode(27);
+const WINDOW_MS = 7 * 24 * 3600 * 1000;
+// SL_NOW makes the output reproducible for tests.
+const NOW = Number(process.env.SL_NOW) || Date.now();
+
+function parseResetsAt(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v < 1e11 ? Math.round(v * 1000) : Math.round(v);
+  if (typeof v === 'string') {
+    const trimmed = v.trim();
+    if (/^\d+$/.test(trimmed)) return parseResetsAt(Number(trimmed));
+    const parsed = Date.parse(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function fmtPercent(n, opts) {
+  const f = opts || {};
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  const decimals = f.decimals || 0;
+  const prefix = f.sign && v > 0 ? '+' : '';
+  return prefix + v.toFixed(decimals) + '%';
+}
+
+function fmtNumber(n, opts) {
+  const f = opts || {};
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  if (f.abbrev === false) return String(Math.round(v));
+  const abs = Math.abs(v);
+  const divisor = abs >= 1e6 ? 1e6 : abs >= 1e3 ? 1e3 : 1;
+  const suffix = abs >= 1e6 ? 'M' : abs >= 1e3 ? 'k' : '';
+  const scaled = v / divisor;
+  const decimals = suffix && Math.abs(scaled) < 10 ? 1 : 0;
+  return scaled.toFixed(decimals) + suffix;
+}
+
+function fmtDuration(ms) {
+  const v = Number(ms);
+  if (!Number.isFinite(v) || v < 0) return null;
+  const totalMinutes = Math.floor(v / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return days + 'd' + hours + 'h';
+  if (hours > 0) return hours + 'h' + String(minutes).padStart(2, '0') + 'm';
+  return minutes + 'm';
+}
+
+function fmtCountdown(resetsAtMs, nowMs) {
+  const target = Number(resetsAtMs);
+  const now = Number(nowMs);
+  if (!Number.isFinite(target) || !Number.isFinite(now)) return null;
+  return target - now <= 0 ? 'now' : fmtDuration(target - now);
+}
+
+function fmtCurrency(usd) {
+  const v = Number(usd);
+  return Number.isFinite(v) ? '$' + v.toFixed(2) : null;
+}
+
+function fmtPath(p, opts) {
+  const f = opts || {};
+  if (typeof p !== 'string' || p === '') return null;
+  const mode = f.mode || 'basename';
+  if (mode === 'full') return p;
+  const normalised = p.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (mode === 'tilde') return normalised.replace(/^(?:[A-Za-z]:)?\/(?:Users|home)\/[^/]+/, '~');
+  const parts = normalised.split('/').filter(Boolean);
+  if (!parts.length) return normalised;
+  if (mode === 'last2') return parts.slice(-2).join('/');
+  return parts[parts.length - 1];
+}
+
+function fmtText(s, opts) {
+  const f = opts || {};
+  if (s === null || s === undefined) return null;
+  const str = String(s);
+  const max = Number(f.max) || 0;
+  if (!max || str.length <= max) return str;
+  return str.slice(0, max - 1) + '…';
+}
+
+function fmtBool(v, opts) {
+  const f = opts || {};
+  if (v === null || v === undefined) return null;
+  const hideWhenFalse = f.hideWhenFalse === undefined ? true : f.hideWhenFalse;
+  if (!v) return hideWhenFalse ? null : (f.offLabel || '');
+  return f.onLabel || 'on';
+}
+
+function weeklyWindow(payload) {
+  const bucket = payload && payload.rate_limits && payload.rate_limits.seven_day;
+  if (!bucket) return null;
+  const resetsAt = parseResetsAt(bucket.resets_at);
+  const used = Number(bucket.used_percentage);
+  if (resetsAt === null || !Number.isFinite(used)) return null;
+  const start = resetsAt - WINDOW_MS;
+  const elapsedFraction = Math.min(1, Math.max(0, (NOW - start) / WINDOW_MS));
+  const daysLeft = Math.max((resetsAt - NOW) / 86400000, 1 / 24);
+  return { used: used, resetsAt: resetsAt, elapsedFraction: elapsedFraction, daysLeft: daysLeft };
+}
+
+function worstMeter(payload) {
+  const out = [];
+  const push = v => { const n = Number(v); if (Number.isFinite(n)) out.push(n); };
+  push(payload && payload.context_window && payload.context_window.used_percentage);
+  push(payload && payload.rate_limits && payload.rate_limits.five_hour && payload.rate_limits.five_hour.used_percentage);
+  push(payload && payload.rate_limits && payload.rate_limits.seven_day && payload.rate_limits.seven_day.used_percentage);
+  return out.length ? Math.max.apply(null, out) : null;
+}
+
+function derivedValue(fn, payload) {
+  if (fn === 'evenBurn') {
+    const w = weeklyWindow(payload);
+    return w ? w.used - w.elapsedFraction * 100 : null;
+  }
+  if (fn === 'pace') {
+    const w = weeklyWindow(payload);
+    return w ? (100 - w.used) / w.daysLeft : null;
+  }
+  if (fn === 'todayLeft') {
+    const w = weeklyWindow(payload);
+    if (!w) return null;
+    const slice = 100 / 7;
+    const dayIndex = Math.floor(w.elapsedFraction * 7);
+    const usedToday = w.used - dayIndex * slice;
+    return Math.min(100, ((slice - usedToday) / slice) * 100);
+  }
+  if (fn === 'mood') return worstMeter(payload);
+  if (fn === 'linesDelta') {
+    const added = Number(payload && payload.cost && payload.cost.total_lines_added);
+    const removed = Number(payload && payload.cost && payload.cost.total_lines_removed);
+    if (!Number.isFinite(added) && !Number.isFinite(removed)) return null;
+    return '+' + (Number.isFinite(added) ? added : 0) + '/-' + (Number.isFinite(removed) ? removed : 0);
+  }
+  if (fn === 'contextLeftTokens') {
+    const size = Number(payload && payload.context_window && payload.context_window.context_window_size);
+    const pct = Number(payload && payload.context_window && payload.context_window.remaining_percentage);
+    if (!Number.isFinite(size) || !Number.isFinite(pct)) return null;
+    return (size * pct) / 100;
+  }
+  return null;
+}
+
+function getPath(obj, path) {
+  if (!obj || !path) return null;
+  let cur = obj;
+  const keys = path.split('.');
+  for (let i = 0; i < keys.length; i++) {
+    if (cur === null || cur === undefined || typeof cur !== 'object') return null;
+    cur = cur[keys[i]];
+  }
+  return cur === undefined ? null : cur;
+}
+
+const MOOD_STOPS = [[0, '\u{1F63A}'], [30, '\u{1F63C}'], [50, '\u{1F640}'], [70, '\u{1F63E}']];
+
+function applyFormat(raw, format) {
+  const f = format || {};
+  const type = f.type || 'text';
+  let out = null;
+
+  if (type === 'raw') {
+    out = raw === null || raw === undefined ? null : String(raw);
+  } else if (type === 'path') {
+    out = fmtPath(raw, { mode: f.mode || 'basename' });
+  } else if (type === 'percent') {
+    out = fmtPercent(raw, f);
+  } else if (type === 'number') {
+    out = fmtNumber(raw, f);
+  } else if (type === 'duration') {
+    out = fmtDuration(raw);
+  } else if (type === 'countdown') {
+    out = fmtCountdown(parseResetsAt(raw), NOW);
+  } else if (type === 'currency') {
+    out = fmtCurrency(raw);
+  } else if (type === 'bool') {
+    out = fmtBool(raw, f);
+  } else if (type === 'count') {
+    const n = Array.isArray(raw) ? raw.length : Number(raw);
+    out = Number.isFinite(n) && n > 0 ? String(n) : null;
+  } else if (type === 'arrow') {
+    const v = Number(raw);
+    if (Number.isFinite(v)) {
+      const arrow = v < -0.5 ? '▼' : v > 0.5 ? '▲' : '▬';
+      out = arrow + Math.abs(v).toFixed(f.decimals || 0);
+    }
+  } else if (type === 'emojiScale') {
+    const v = Number(raw);
+    if (Number.isFinite(v)) {
+      const stops = (f.stops || MOOD_STOPS).slice().sort((a, b) => a[0] - b[0]);
+      out = stops[0][1];
+      for (let i = 0; i < stops.length; i++) if (v >= stops[i][0]) out = stops[i][1];
+    }
+  } else {
+    let s = raw === null || raw === undefined ? null : String(raw);
+    if (s !== null && f.slice) s = s.slice(0, f.slice);
+    out = s === null ? null : fmtText(s, { max: f.max });
+  }
+
+  if (out === null || out === undefined || out === '') return null;
+  if (f.prefix) out = f.prefix + out;
+  if (f.suffix) out = out + f.suffix;
+  return out;
+}
+
+function getValue(segment, payload) {
+  if (!segment || !segment.source) return null;
+  let raw = null;
+  try {
+    raw = segment.source.kind === 'derived'
+      ? derivedValue(segment.source.fn, payload)
+      : getPath(payload, segment.source.path);
+  } catch (e) {
+    return null;
+  }
+  if (raw === null || raw === undefined) return null;
+  if (segment.hideValues && segment.hideValues.indexOf(String(raw)) !== -1) return null;
+
+  const display = applyFormat(raw, segment.format);
+  if (display === null) return null;
+
+  let colorValue = Number(raw);
+  if (!Number.isFinite(colorValue)) {
+    const scale = segment.scaleMap;
+    colorValue = scale && scale[String(raw)] !== undefined ? scale[String(raw)] : null;
+  }
+  return { raw: raw, display: display, colorValue: colorValue };
+}
+
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex === null || hex === undefined ? '' : hex).trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex(rgb) {
+  const channel = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return '#' + rgb.map(channel).join('');
+}
+
+function resolveColor(spec, value) {
+  if (!spec || typeof spec !== 'object') return null;
+  if (spec.mode === 'static') return spec.value || null;
+  const v = Number(value);
+  if (spec.mode === 'threshold') {
+    const stops = (spec.stops || []).slice().sort((a, b) => a[0] - b[0]);
+    if (!stops.length) return null;
+    if (!Number.isFinite(v)) return stops[0][1];
+    let picked = stops[0][1];
+    for (let i = 0; i < stops.length; i++) if (v >= stops[i][0]) picked = stops[i][1];
+    return picked;
+  }
+  if (spec.mode === 'gradient') {
+    const from = hexToRgb(spec.from);
+    const to = hexToRgb(spec.to);
+    if (!from || !to) return null;
+    const min = Number(spec.min === undefined ? 0 : spec.min);
+    const max = Number(spec.max === undefined ? 100 : spec.max);
+    const t = max === min ? 0 : Math.min(1, Math.max(0, (v - min) / (max - min)));
+    return rgbToHex(from.map((c, i) => c + (to[i] - c) * t));
+  }
+  return null;
+}
+
+function hexToAnsi(hex) {
+  const rgb = hexToRgb(hex);
+  return rgb ? '38;2;' + rgb.join(';') : null;
+}
+
+function ansiWrap(text, hex, opts) {
+  const o = opts || {};
+  const codes = [];
+  if (o.bold) codes.push('1');
+  if (o.dim) codes.push('2');
+  const colour = hexToAnsi(hex);
+  if (colour) codes.push(colour);
+  if (!codes.length) return text;
+  return ESC + '[' + codes.join(';') + 'm' + text + ESC + '[0m';
+}
+
+function safeHex(hex) {
+  return /^#[0-9a-f]{6}$/i.test(String(hex)) ? String(hex) : null;
+}
+
+function segmentText(segment, value) {
+  const pieces = [];
+  if (segment.showEmoji !== false && segment.emoji) pieces.push(segment.emoji);
+  if (segment.showLabel && segment.label) pieces.push(segment.label + ':');
+  pieces.push(value.display);
+  return pieces.join(' ');
+}
+
+function render(payload) {
+  const lineCount = Math.max(1, Math.min(3, Number(CFG.lineCount) || 1));
+  const lines = [];
+  for (let i = 0; i < lineCount; i++) lines.push([]);
+
+  const segments = CFG.segments || [];
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    const value = getValue(segment, payload);
+    if (!value) continue;
+    const index = Math.min(lineCount - 1, Math.max(0, Number(segment.line) || 0));
+    lines[index].push({
+      segment: segment,
+      text: segmentText(segment, value),
+      hex: safeHex(resolveColor(segment.color, value.colorValue))
+    });
+  }
+
+  const separator = CFG.separator === undefined ? ' | ' : CFG.separator;
+  const joiner = ansiWrap(separator, null, { dim: CFG.dimSeparator !== false });
+  return lines
+    .filter(parts => parts.length > 0)
+    .map(parts => parts
+      .map(p => ansiWrap(p.text, p.hex, { bold: p.segment.bold, dim: p.segment.dim }))
+      .join(joiner))
+    .join('\n');
+}
+
+function fallback(payload) {
+  const model = getPath(payload, 'model.display_name');
+  const dir = fmtPath(getPath(payload, 'workspace.current_dir') || getPath(payload, 'cwd'), { mode: 'basename' });
+  return [model, dir].filter(Boolean).join(' | ');
+}
+
+let raw = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => { raw += chunk; });
+process.stdin.on('end', () => {
+  let payload = {};
+  try {
+    payload = JSON.parse(raw || '{}') || {};
+  } catch (e) {
+    payload = {};
+  }
+  let out;
+  try {
+    out = render(payload);
+  } catch (e) {
+    try { out = fallback(payload); } catch (e2) { out = ''; }
+  }
+  process.stdout.write(out + '\n');
+});
+`;
+
+// ---------- src/generate.js ----------
+// The three export formats: a runnable script, a handover prompt, and a config
+// file that can be read back in.
+
+
+const SEGMENT_KEYS = [
+  'id', 'label', 'emoji', 'source', 'format', 'showLabel', 'showEmoji',
+  'line', 'color', 'hideValues', 'scaleMap', 'bold', 'dim'
+];
+
+const DEFAULT_INSTALL_PATH = 'C:/Users/marku/.claude/statusline.js';
+
+function normaliseConfig(config) {
+  const c = config || {};
+  return {
+    version: 1,
+    separator: c.separator === undefined ? ' | ' : c.separator,
+    dimSeparator: c.dimSeparator !== false,
+    lineCount: Math.max(1, Math.min(3, Number(c.lineCount) || 1)),
+    segments: (c.segments || []).map(segment => {
+      const out = {};
+      for (const key of SEGMENT_KEYS) {
+        if (segment[key] !== undefined) out[key] = segment[key];
+      }
+      return out;
+    })
+  };
+}
+
+function generateScript(config) {
+  const cfg = normaliseConfig(config);
+  return [
+    '#!/usr/bin/env node',
+    '// Claude Code status line, generated by the Statusline Builder.',
+    '//',
+    '// Install by pointing settings.json at this file:',
+    '//   "statusLine": { "type": "command", "command": "node <path to this file>" }',
+    '//',
+    '// Everything configurable lives in CFG below; the engine underneath is generic.',
+    '',
+    'const CFG = ' + JSON.stringify(cfg, null, 2) + ';',
+    RUNTIME_SOURCE.trim(),
+    ''
+  ].join('\n');
+}
+
+function generateConfigJson(config) {
+  return JSON.stringify(normaliseConfig(config), null, 2);
+}
+
+function parseConfigJson(text) {
+  const parsed = JSON.parse(text);
+  if (!parsed || typeof parsed !== 'object') throw new Error('Config muss ein Objekt sein.');
+  if (!Array.isArray(parsed.segments)) throw new Error('Config braucht ein segments-Array.');
+
+  const segments = parsed.segments.map((segment, index) => {
+    if (!segment || typeof segment !== 'object') {
+      throw new Error('Segment ' + index + ' ist kein Objekt.');
+    }
+    // Fall back to the catalogue entry so an abbreviated config still works.
+    const base = CATALOG_BY_ID[segment.id] || {};
+    if (!segment.source && !base.source) {
+      throw new Error('Segment ' + (segment.id || index) + ' hat keine Quelle.');
+    }
+    return { ...base, ...segment };
+  });
+
+  return { ...normaliseConfig({ ...parsed, segments }), segments };
+}
+
+function describeColor(color) {
+  if (!color) return 'keine Farbe';
+  if (color.mode === 'static') return 'fest ' + color.value;
+  if (color.mode === 'threshold') {
+    return 'Schwellen ' + (color.stops || []).map(([at, hex]) => at + '→' + hex).join(', ');
+  }
+  if (color.mode === 'gradient') {
+    return 'Verlauf ' + color.from + '→' + color.to + ' über ' + color.min + '–' + color.max;
+  }
+  return color.mode;
+}
+
+function describeFormat(format) {
+  const f = format || {};
+  const bits = [f.type || 'text'];
+  for (const key of ['decimals', 'mode', 'max', 'slice', 'prefix', 'suffix', 'onLabel', 'abbrev']) {
+    if (f[key] !== undefined) bits.push(key + '=' + f[key]);
+  }
+  return bits.join(' ');
+}
+
+function generatePrompt(config, opts = {}) {
+  const cfg = normaliseConfig(config);
+  const installPath = opts.installPath || DEFAULT_INSTALL_PATH;
+
+  const lines = [];
+  for (let line = 0; line < cfg.lineCount; line++) {
+    const onThisLine = cfg.segments.filter(s => (Number(s.line) || 0) === line);
+    if (!onThisLine.length) continue;
+    lines.push('');
+    lines.push('**Zeile ' + (line + 1) + '**');
+    onThisLine.forEach((s, i) => {
+      const parts = [
+        (i + 1) + '. `' + s.id + '`',
+        s.source && s.source.kind === 'derived'
+          ? 'abgeleitet über `' + s.source.fn + '`'
+          : 'Feld `' + (s.source ? s.source.path : '?') + '`',
+        'Format: ' + describeFormat(s.format),
+        'Farbe: ' + describeColor(s.color)
+      ];
+      if (s.showEmoji !== false && s.emoji) parts.push('Emoji: ' + s.emoji);
+      if (s.showLabel && s.label) parts.push('Label: ' + s.label);
+      lines.push('   - ' + parts.join(' · '));
+    });
+  }
+
+  return [
+    'Bitte richte meine Claude Code Statusline ein.',
+    '',
+    '## Ziel',
+    '',
+    'Ein Node-Skript unter `' + installPath + '`, das den Statusline-JSON-Payload von stdin liest',
+    'und die unten beschriebene Zeile ausgibt. Kein `jq`, keine Dependencies — nur Node.',
+    'Danach `~/.claude/settings.json` eintragen:',
+    '',
+    '```json',
+    '"statusLine": { "type": "command", "command": "node ' + installPath + '" }',
+    '```',
+    '',
+    '## Aufbau',
+    '',
+    '- Trennzeichen: `' + cfg.separator + '`' + (cfg.dimSeparator ? ' (gedimmt)' : ''),
+    '- Zeilen: ' + cfg.lineCount,
+    '- Segmente in genau dieser Reihenfolge:',
+    ...lines,
+    '',
+    '## Regeln',
+    '',
+    '- Fehlt ein Feld im Payload, entfällt das Segment stillschweigend — niemals `null` oder leere Slots drucken.',
+    '- `resets_at` kann Epoch-Sekunden, Millisekunden oder ISO-String sein; alle drei abfangen.',
+    '- Es gibt nur die Buckets `rate_limits.five_hour` und `rate_limits.seven_day`.',
+    '- Farben als Truecolor (`ESC[38;2;r;g;bm`), am Ende jedes Segments zurücksetzen.',
+    '- Das ganze Rendering in try/catch; im Fehlerfall nur Modell und Verzeichnis ausgeben.',
+    '',
+    '## Fertige Konfiguration',
+    '',
+    'Falls du sie direkt übernehmen willst — das ist exakt die Config, die mein Builder erzeugt hat:',
+    '',
+    '```json',
+    generateConfigJson(cfg),
+    '```'
+  ].join('\n');
+}
+
+function generateSettingsSnippet(installPath) {
+  return JSON.stringify(
+    { statusLine: { type: 'command', command: 'node ' + (installPath || DEFAULT_INSTALL_PATH) } },
+    null,
+    2
+  );
+}
+
+// ---------- src/state.js ----------
+// One state object, one persistence key, one notification channel.
+
+
+const KEY = 'statusline-builder:v1';
+
+function defaultState() {
+  return {
+    segments: REFERENCE_ORDER.map(id => ({ ...CATALOG_BY_ID[id] })),
+    separator: ' | ',
+    dimSeparator: true,
+    lineCount: 1,
+    sort: 'manual',
+    preview: { ctx: 10, fiveHour: 1, sevenDay: 32 },
+    installPath: DEFAULT_INSTALL_PATH,
+    tab: 'script'
+  };
+}
+
+// Segments are stored with their full definition so an old saved state still
+// works, but catalogue fields win for anything the user never touched.
+function rehydrate(segments) {
+  if (!Array.isArray(segments)) return defaultState().segments;
+  return segments
+    .filter(s => s && CATALOG_BY_ID[s.id])
+    .map(s => ({ ...CATALOG_BY_ID[s.id], ...s }));
+}
+
+function load() {
+  const base = defaultState();
+  try {
+    const stored = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (!stored) return base;
+    return {
+      ...base,
+      ...stored,
+      segments: rehydrate(stored.segments),
+      preview: { ...base.preview, ...(stored.preview || {}) }
+    };
+  } catch {
+    return base;
+  }
+}
+
+let state = null;
+const listeners = new Set();
+
+function getState() {
+  if (!state) state = load();
+  return state;
+}
+
+function subscribe(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function commit() {
+  const current = getState();
+  try {
+    localStorage.setItem(KEY, JSON.stringify(current));
+  } catch {
+    // Private mode or a full quota: the app still works, it just forgets.
+  }
+  listeners.forEach(fn => fn(current));
+}
+
+function patch(values) {
+  Object.assign(getState(), values);
+  commit();
+}
+
+function reset() {
+  state = defaultState();
+  commit();
+}
+
+function toConfig() {
+  const s = getState();
+  return {
+    segments: s.segments,
+    separator: s.separator,
+    dimSeparator: s.dimSeparator,
+    lineCount: s.lineCount
+  };
+}
+
+// ---------- src/ui-export.js ----------
+// Preview rendering and the export panel.
+
+
+const HOUR = 3600 * 1000;
+
+// SAMPLE_PAYLOAD is injected by build.js from sample-payload.json.
+function previewPayload() {
+  const { preview } = getState();
+  const now = Date.now();
+  const base = JSON.parse(JSON.stringify(SAMPLE_PAYLOAD));
+
+  base.context_window.used_percentage = preview.ctx;
+  base.context_window.remaining_percentage = 100 - preview.ctx;
+  base.rate_limits.five_hour.used_percentage = preview.fiveHour;
+  base.rate_limits.seven_day.used_percentage = preview.sevenDay;
+
+  // The fixture's timestamps are fixed, which would render every countdown as
+  // "now". Anchor them to the current clock so the preview stays meaningful.
+  base.rate_limits.five_hour.resets_at = Math.round((now + 4.9 * HOUR) / 1000);
+  base.rate_limits.seven_day.resets_at = Math.round((now + 4.2 * 24 * HOUR) / 1000);
+  return base;
+}
+
+function renderPreview(el, readoutEl) {
+  const payload = previewPayload();
+  el.innerHTML = renderHtml(toConfig(), payload, Date.now());
+
+  const now = Date.now();
+  const bits = [
+    ['heute übrig', todayLeft(payload, now), '%'],
+    ['Tempo', pace(payload, now), '%/d'],
+    ['vs. Even-Burn', evenBurn(payload, now), '']
+  ]
+    .filter(([, v]) => v !== null)
+    .map(([label, v, unit]) => label + ' ' + v.toFixed(0) + unit);
+  readoutEl.textContent = bits.join('  ·  ');
+}
+
+const HINTS = {
+  script: 'Datei speichern und in settings.json darauf zeigen. Läuft mit purem Node, ohne jq.',
+  prompt: 'An Claude geben — enthält Segmentliste, Regeln und die fertige Config.',
+  config: 'Sichern oder in einer anderen Session wieder einlesen: einfügen und übernehmen.'
+};
+
+function exportText(tab) {
+  const config = toConfig();
+  if (tab === 'prompt') return generatePrompt(config, { installPath: getState().installPath });
+  if (tab === 'config') return generateConfigJson(config);
+  return generateScript(config);
+}
+
+const FILENAMES = { script: 'statusline.js', prompt: 'statusline-prompt.md', config: 'statusline-config.json' };
+
+function download(tab, text) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = FILENAMES[tab] || 'statusline.txt';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+async function copyText(text, button) {
+  const original = button.textContent;
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch {
+    ok = false;
+  }
+  button.textContent = ok ? 'Kopiert' : 'Bitte manuell markieren';
+  setTimeout(() => { button.textContent = original; }, 1600);
+}
+
+function importConfig(text) {
+  const config = parseConfigJson(text);
+  patch({
+    segments: config.segments,
+    separator: config.separator,
+    dimSeparator: config.dimSeparator,
+    lineCount: config.lineCount,
+    sort: 'manual'
+  });
+}
+
+function mountExport(dom) {
+  const setTab = tab => {
+    patch({ tab });
+  };
+
+  dom.tabs.forEach(button => {
+    button.addEventListener('click', () => setTab(button.dataset.tab));
+  });
+
+  dom.copy.addEventListener('click', () => copyText(dom.out.value, dom.copy));
+  dom.download.addEventListener('click', () => download(getState().tab, dom.out.value));
+
+  dom.import.addEventListener('click', () => {
+    try {
+      importConfig(dom.out.value);
+      dom.hint.textContent = 'Config übernommen.';
+    } catch (error) {
+      dom.hint.textContent = 'Config nicht lesbar: ' + error.message;
+    }
+  });
+
+  dom.installPath.addEventListener('input', () => patch({ installPath: dom.installPath.value }));
+}
+
+function renderExport(dom) {
+  const { tab, installPath } = getState();
+
+  dom.tabs.forEach(button => {
+    button.setAttribute('aria-selected', String(button.dataset.tab === tab));
+  });
+
+  // Leave the box alone while the user is pasting into it on the config tab.
+  if (document.activeElement !== dom.out) dom.out.value = exportText(tab);
+  dom.out.readOnly = tab !== 'config';
+  dom.import.hidden = tab !== 'config';
+  dom.hint.textContent = HINTS[tab];
+
+  if (document.activeElement !== dom.installPath) dom.installPath.value = installPath;
+  dom.snippet.value = generateSettingsSnippet(installPath);
+}
+
+// ---------- src/ui.js ----------
+// Catalogue, builder rows, and the wiring that ties everything to state.
+
+
+const el = (tag, props = {}, children = []) => {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === 'class') node.className = value;
+    else if (key === 'text') node.textContent = value;
+    else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
+    else if (value === true) node.setAttribute(key, '');
+    else if (value !== false && value !== null && value !== undefined) node.setAttribute(key, value);
+  }
+  for (const child of [].concat(children)) if (child) node.appendChild(child);
+  return node;
+};
+
+const FORMAT_CHOICES = {
+  path: [
+    { label: 'Ordnername', patch: { mode: 'basename' } },
+    { label: 'Letzte 2 Ebenen', patch: { mode: 'last2' } },
+    { label: 'Voller Pfad', patch: { mode: 'full' } },
+    { label: 'Home als ~', patch: { mode: 'tilde' } }
+  ],
+  percent: [
+    { label: 'ganzzahlig', patch: { decimals: 0 } },
+    { label: '1 Nachkomma', patch: { decimals: 1 } }
+  ],
+  number: [
+    { label: 'gekürzt 95k', patch: { abbrev: true } },
+    { label: 'voll 95000', patch: { abbrev: false } }
+  ],
+  text: [
+    { label: 'voll', patch: { max: 0, slice: 0 } },
+    { label: 'max 12', patch: { max: 12, slice: 0 } },
+    { label: 'max 24', patch: { max: 24, slice: 0 } },
+    { label: 'erste 8', patch: { max: 0, slice: 8 } }
+  ],
+  bool: [
+    { label: 'nur wenn an', patch: { hideWhenFalse: true } },
+    { label: 'immer zeigen', patch: { hideWhenFalse: false, offLabel: 'off' } }
+  ],
+  arrow: [
+    { label: '▼▲ ganzzahlig', patch: { decimals: 0 } },
+    { label: '▼▲ 1 Nachkomma', patch: { decimals: 1 } }
+  ],
+  emojiScale: [
+    { label: 'Katzen', patch: { stops: MOOD_STOPS } },
+    { label: 'Ampel', patch: { stops: [[0, '🟢'], [50, '🟡'], [75, '🟠'], [90, '🔴']] } },
+    { label: 'Wetter', patch: { stops: [[0, '☀️'], [40, '⛅'], [65, '🌧️'], [85, '⛈️']] } },
+    { label: 'Akku', patch: { stops: [[0, '🔋'], [50, '🪫']] } }
+  ],
+  countdown: [{ label: 'Restzeit', patch: {} }],
+  duration: [{ label: 'Dauer', patch: {} }],
+  currency: [{ label: 'USD', patch: {} }],
+  count: [{ label: 'Anzahl', patch: {} }],
+  raw: [{ label: 'unverändert', patch: {} }]
+};
+
+const COLOR_CHOICES = [
+  { id: 'default', label: 'Standard' },
+  { id: 'usage', label: 'Ampel grün→rot' },
+  { id: 'inverse', label: 'Ampel invers' },
+  { id: 'static', label: 'Einfarbig' },
+  { id: 'gradient', label: 'Verlauf' }
+];
+
+const GRADIENT = { mode: 'gradient', from: '#7ec699', to: '#e06c75', min: 0, max: 100 };
+
+function sameValue(a, b) {
+  if (typeof a === 'number' || typeof b === 'number') return (Number(a) || 0) === (Number(b) || 0);
+  if (typeof a === 'boolean' || typeof b === 'boolean') return Boolean(a) === Boolean(b);
+  if (a && typeof a === 'object') return JSON.stringify(a) === JSON.stringify(b);
+  return String(a === undefined || a === null ? '' : a) === String(b === undefined || b === null ? '' : b);
+}
+
+function formatChoices(segment) {
+  return FORMAT_CHOICES[(segment.format || {}).type || 'text'] || [];
+}
+
+function activeFormatChoice(segment) {
+  const choices = formatChoices(segment);
+  const index = choices.findIndex(choice =>
+    Object.keys(choice.patch).every(key => sameValue((segment.format || {})[key], choice.patch[key])));
+  return index === -1 ? 0 : index;
+}
+
+function activeColorChoice(segment) {
+  const fallback = (CATALOG_BY_ID[segment.id] || {}).color;
+  if (fallback && JSON.stringify(fallback) === JSON.stringify(segment.color)) return 'default';
+  const color = segment.color || {};
+  if (color.mode === 'gradient') return 'gradient';
+  if (color.mode === 'static') return 'static';
+  if (JSON.stringify(color.stops) === JSON.stringify(USAGE.stops)) return 'usage';
+  if (JSON.stringify(color.stops) === JSON.stringify(INVERSE.stops)) return 'inverse';
+  return 'default';
+}
+
+function colorFor(choiceId, segment) {
+  if (choiceId === 'usage') return { ...USAGE };
+  if (choiceId === 'inverse') return { ...INVERSE };
+  if (choiceId === 'gradient') return { ...GRADIENT };
+  if (choiceId === 'static') {
+    const current = segment.color || {};
+    return { mode: 'static', value: current.mode === 'static' ? current.value : '#c8ccd4' };
+  }
+  return { ...((CATALOG_BY_ID[segment.id] || {}).color || { mode: 'static', value: '#c8ccd4' }) };
+}
+
+const select = (options, selected, onChange) => {
+  const node = el('select', { onchange: event => onChange(event.target.value) });
+  for (const option of options) {
+    node.appendChild(el('option', { value: option.value, text: option.label }));
+  }
+  node.value = selected;
+  return node;
+};
+
+function mount() {
+  const dom = {
+    preview: document.getElementById('preview'),
+    readout: document.getElementById('derived-readout'),
+    catalog: document.getElementById('catalog'),
+    rows: document.getElementById('rows'),
+    separator: document.getElementById('separator'),
+    dimSeparator: document.getElementById('dim-separator'),
+    lineCount: document.getElementById('line-count'),
+    sort: document.getElementById('sort'),
+    clearAll: document.getElementById('clear-all'),
+    tabs: Array.from(document.querySelectorAll('.tab')),
+    out: document.getElementById('export-out'),
+    copy: document.getElementById('copy'),
+    download: document.getElementById('download'),
+    import: document.getElementById('import'),
+    hint: document.getElementById('export-hint'),
+    installPath: document.getElementById('install-path'),
+    snippet: document.getElementById('settings-snippet'),
+    sliders: [
+      ['ctx', document.getElementById('pv-ctx'), document.getElementById('pv-ctx-out')],
+      ['fiveHour', document.getElementById('pv-5h'), document.getElementById('pv-5h-out')],
+      ['sevenDay', document.getElementById('pv-7d'), document.getElementById('pv-7d-out')]
+    ]
+  };
+
+  const refresh = () => {
+    renderPreview(dom.preview, dom.readout);
+    renderExport(dom);
+  };
+
+  const rebuild = () => {
+    renderCatalog(dom, rebuild, refresh);
+    renderRows(dom, rebuild, refresh);
+    refresh();
+  };
+
+  dom.separator.addEventListener('change', () => patch({ separator: dom.separator.value }));
+  dom.dimSeparator.addEventListener('change', () => patch({ dimSeparator: dom.dimSeparator.checked }));
+  dom.lineCount.addEventListener('change', () => {
+    patch({ lineCount: Number(dom.lineCount.value) });
+    rebuild();
+  });
+
+  dom.sort.addEventListener('change', () => {
+    applySort(dom.sort.value);
+    rebuild();
+  });
+
+  dom.clearAll.addEventListener('click', () => {
+    patch({ segments: [] });
+    rebuild();
+  });
+
+  for (const [key, input, output] of dom.sliders) {
+    input.addEventListener('input', () => {
+      getState().preview[key] = Number(input.value);
+      output.textContent = input.value + '%';
+      commit();
+    });
+  }
+
+  mountExport(dom);
+  subscribe(() => refresh());
+
+  const state = getState();
+  dom.separator.value = state.separator;
+  dom.dimSeparator.checked = state.dimSeparator;
+  dom.lineCount.value = String(state.lineCount);
+  dom.sort.value = state.sort;
+  for (const [key, input, output] of dom.sliders) {
+    input.value = String(state.preview[key]);
+    output.textContent = state.preview[key] + '%';
+  }
+
+  rebuild();
+}
+
+function applySort(mode) {
+  const state = getState();
+  const segments = state.segments.slice();
+
+  if (mode === 'alpha') {
+    segments.sort((a, b) => a.id.localeCompare(b.id));
+  } else if (mode === 'group') {
+    const order = GROUPS.map(g => g.id);
+    segments.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || a.id.localeCompare(b.id));
+  } else if (mode === 'reference') {
+    const rank = id => {
+      const index = REFERENCE_ORDER.indexOf(id);
+      return index === -1 ? REFERENCE_ORDER.length : index;
+    };
+    segments.sort((a, b) => rank(a.id) - rank(b.id));
+  }
+
+  patch({ segments, sort: mode });
+}
+
+function renderCatalog(dom, rebuild) {
+  const state = getState();
+  const active = new Set(state.segments.map(s => s.id));
+  dom.catalog.replaceChildren();
+
+  for (const group of GROUPS) {
+    const members = CATALOG.filter(s => s.group === group.id);
+    if (!members.length) continue;
+
+    const list = el('div', { class: 'group__list' });
+    for (const segment of members) {
+      const on = active.has(segment.id);
+      list.appendChild(el('button', {
+        class: 'chip',
+        type: 'button',
+        'aria-pressed': String(on),
+        title: segment.source.kind === 'derived'
+          ? 'berechnet: ' + segment.source.fn
+          : segment.source.path,
+        onclick: () => {
+          const current = getState();
+          const next = active.has(segment.id)
+            ? current.segments.filter(s => s.id !== segment.id)
+            : current.segments.concat([{ ...segment }]);
+          patch({ segments: next, sort: 'manual' });
+          rebuild();
+        }
+      }, [
+        segment.emoji ? el('span', { class: 'chip__emoji', text: segment.emoji }) : null,
+        el('span', { text: segment.label })
+      ]));
+    }
+
+    dom.catalog.appendChild(el('div', { class: 'group' }, [
+      el('div', { class: 'group__head' }, [
+        el('span', { text: group.emoji }),
+        el('span', { text: group.label })
+      ]),
+      list
+    ]));
+  }
+}
+
+function renderRows(dom, rebuild) {
+  const state = getState();
+  dom.rows.replaceChildren();
+
+  if (!state.segments.length) {
+    dom.rows.appendChild(el('p', { class: 'empty', text: 'Noch nichts ausgewählt — links Segmente antippen.' }));
+    return;
+  }
+
+  const move = (from, to) => {
+    const segments = getState().segments.slice();
+    if (to < 0 || to >= segments.length) return;
+    segments.splice(to, 0, segments.splice(from, 1)[0]);
+    patch({ segments, sort: 'manual' });
+    rebuild();
+  };
+
+  state.segments.forEach((segment, index) => {
+    const choices = formatChoices(segment);
+    const colorId = activeColorChoice(segment);
+
+    const swatch = el('input', {
+      class: 'row__swatch',
+      type: 'color',
+      value: (segment.color || {}).mode === 'static' ? (segment.color.value || '#c8ccd4') : '#c8ccd4',
+      'aria-label': 'Farbe für ' + segment.id,
+      oninput: event => {
+        segment.color = { mode: 'static', value: event.target.value };
+        commit();
+      }
+    });
+    swatch.hidden = colorId !== 'static';
+
+    const row = el('div', { class: 'row', draggable: 'true' }, [
+      el('span', { class: 'row__grip', text: '⠿', 'aria-hidden': 'true' }),
+
+      el('div', { class: 'row__name' }, [
+        el('span', { class: 'row__id', text: segment.id, title: segment.id }),
+        el('span', { class: 'row__group', text: segment.group })
+      ]),
+
+      el('input', {
+        class: 'row__emoji',
+        type: 'text',
+        maxlength: '4',
+        value: segment.emoji || '',
+        'aria-label': 'Emoji für ' + segment.id,
+        oninput: event => {
+          segment.emoji = event.target.value;
+          segment.showEmoji = event.target.value.length > 0;
+          commit();
+        }
+      }),
+
+      choices.length > 1
+        ? select(
+            choices.map((choice, i) => ({ value: String(i), label: choice.label })),
+            String(activeFormatChoice(segment)),
+            value => {
+              segment.format = { ...segment.format, ...choices[Number(value)].patch };
+              commit();
+            }
+          )
+        : el('span', { class: 'row__group', text: (segment.format || {}).type || 'text' }),
+
+      select(
+        COLOR_CHOICES.map(choice => ({ value: choice.id, label: choice.label })),
+        colorId,
+        value => {
+          segment.color = colorFor(value, segment);
+          swatch.hidden = value !== 'static';
+          if (value === 'static') swatch.value = segment.color.value;
+          commit();
+        }
+      ),
+
+      select(
+        Array.from({ length: state.lineCount }, (_, i) => ({ value: String(i), label: 'Zeile ' + (i + 1) })),
+        String(Math.min(segment.line || 0, state.lineCount - 1)),
+        value => {
+          segment.line = Number(value);
+          commit();
+        }
+      ),
+
+      swatch,
+
+      el('label', { class: 'row__toggle' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: segment.showLabel === true,
+          onchange: event => {
+            segment.showLabel = event.target.checked;
+            commit();
+          }
+        }),
+        el('span', { text: 'Label' })
+      ]),
+
+      el('div', { class: 'row__toggle' }, [
+        el('button', {
+          class: 'icon-btn', type: 'button', title: 'nach oben',
+          onclick: () => move(index, index - 1)
+        }, [el('span', { text: '↑' })]),
+        el('button', {
+          class: 'icon-btn', type: 'button', title: 'nach unten',
+          onclick: () => move(index, index + 1)
+        }, [el('span', { text: '↓' })]),
+        el('button', {
+          class: 'icon-btn icon-btn--danger', type: 'button', title: 'entfernen',
+          onclick: () => {
+            patch({ segments: getState().segments.filter((_, i) => i !== index), sort: 'manual' });
+            rebuild();
+          }
+        }, [el('span', { text: '✕' })])
+      ])
+    ]);
+
+    row.addEventListener('dragstart', event => {
+      event.dataTransfer.setData('text/plain', String(index));
+      event.dataTransfer.effectAllowed = 'move';
+      row.classList.add('row--dragging');
+    });
+    row.addEventListener('dragend', () => row.classList.remove('row--dragging'));
+    row.addEventListener('dragover', event => {
+      event.preventDefault();
+      row.classList.add('row--over');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('row--over'));
+    row.addEventListener('drop', event => {
+      event.preventDefault();
+      row.classList.remove('row--over');
+      const from = Number(event.dataTransfer.getData('text/plain'));
+      if (Number.isFinite(from) && from !== index) move(from, index);
+    });
+
+    dom.rows.appendChild(row);
+  });
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
+  else mount();
+}
+</script>

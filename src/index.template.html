@@ -1,0 +1,118 @@
+<title>Claude Code Statusline Builder</title>
+<style>/*CSS*/</style>
+
+<header class="proof">
+  <div class="proof__inner">
+    <div class="proof__head">
+      <h1 class="proof__title">Statusline Builder</h1>
+      <span class="proof__sub">Claude Code &middot; Payload-Schema 2.1.227</span>
+      <span class="proof__spacer"></span>
+      <label class="field">
+        <span>Trenner</span>
+        <select id="separator">
+          <option value=" | ">Pipe&nbsp;&nbsp;|</option>
+          <option value=" · ">Punkt&nbsp;&nbsp;·</option>
+          <option value=" ▸ ">Pfeil&nbsp;&nbsp;▸</option>
+          <option value="  ">Leerraum</option>
+          <option value=" • ">Bullet&nbsp;&nbsp;•</option>
+          <option value=" ┃ ">Balken&nbsp;&nbsp;┃</option>
+        </select>
+      </label>
+      <label class="field">
+        <input type="checkbox" id="dim-separator" />
+        <span>gedimmt</span>
+      </label>
+      <label class="field">
+        <span>Zeilen</span>
+        <select id="line-count">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="terminal" id="preview" aria-live="polite" aria-label="Vorschau der Statusline"></div>
+
+    <div class="toolbar">
+      <label class="slider">
+        <span>Kontext</span>
+        <input type="range" id="pv-ctx" min="0" max="100" step="1" />
+        <output id="pv-ctx-out"></output>
+      </label>
+      <label class="slider">
+        <span>5h-Limit</span>
+        <input type="range" id="pv-5h" min="0" max="100" step="1" />
+        <output id="pv-5h-out"></output>
+      </label>
+      <label class="slider">
+        <span>7d-Limit</span>
+        <input type="range" id="pv-7d" min="0" max="100" step="1" />
+        <output id="pv-7d-out"></output>
+      </label>
+      <span class="proof__spacer"></span>
+      <span class="slider" id="derived-readout"></span>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+  <section class="panel panel--catalog">
+    <div class="panel__head">
+      <h2 class="panel__title">Segmente</h2>
+      <span class="panel__spacer"></span>
+      <button class="icon-btn" id="clear-all" type="button">alle aus</button>
+    </div>
+    <div class="panel__body" id="catalog"></div>
+  </section>
+
+  <section class="panel panel--builder">
+    <div class="panel__head">
+      <h2 class="panel__title">Reihenfolge &amp; Darstellung</h2>
+      <span class="panel__spacer"></span>
+      <label class="field">
+        <span>Sortierung</span>
+        <select id="sort">
+          <option value="manual">manuell</option>
+          <option value="reference">Referenz-Layout</option>
+          <option value="group">nach Gruppe</option>
+          <option value="alpha">alphabetisch</option>
+        </select>
+      </label>
+    </div>
+    <div class="panel__body">
+      <div class="rows" id="rows"></div>
+    </div>
+  </section>
+
+  <section class="panel panel--export">
+    <div class="panel__head">
+      <h2 class="panel__title">Übergabe</h2>
+      <span class="panel__spacer"></span>
+      <div class="tabs" role="tablist">
+        <button class="tab" type="button" role="tab" data-tab="script">statusline.js</button>
+        <button class="tab" type="button" role="tab" data-tab="prompt">Prompt für Claude</button>
+        <button class="tab" type="button" role="tab" data-tab="config">Config</button>
+      </div>
+    </div>
+    <div class="panel__body">
+      <textarea class="code" id="export-out" spellcheck="false" aria-label="Export"></textarea>
+      <div class="actions">
+        <button class="btn btn--primary" type="button" id="copy">Kopieren</button>
+        <button class="btn" type="button" id="download">Herunterladen</button>
+        <button class="btn" type="button" id="import" hidden>Config übernehmen</button>
+      </div>
+      <p class="hint" id="export-hint"></p>
+      <div class="install">
+        <label class="field control" style="flex-direction:column;align-items:stretch;gap:5px">
+          <span>Zielpfad</span>
+          <input type="text" id="install-path" spellcheck="false" />
+        </label>
+        <textarea class="code" id="settings-snippet" style="min-height:96px" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
+        <p class="hint">Kommt in <code>~/.claude/settings.json</code>. Kein <code>jq</code> nötig — nur Node.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module">/*BUNDLE*/</script>
