@@ -10,7 +10,7 @@ const SEGMENT_KEYS = [
   'line', 'color', 'hideValues', 'scaleMap', 'bold', 'dim', 'group'
 ];
 
-export const DEFAULT_INSTALL_PATH = 'C:/Users/marku/.claude/statusline.js';
+export const DEFAULT_INSTALL_PATH = 'C:/Users/<user>/.claude/statusline.js';
 export const MAX_LINES = 3;
 
 export function normaliseConfig(config) {

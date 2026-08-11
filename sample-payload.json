@@ -1,23 +1,30 @@
 {
-  "session_id": "986fc58a-95ca-4c34-8a6e-c95eec5ec0bb",
+  "session_id": "00000000-0000-4000-8000-000000000000",
   "session_name": "statusline-builder",
-  "transcript_path": "C:/Users/marku/.claude/projects/statusline/986fc58a.jsonl",
-  "cwd": "C:/Users/marku/.cursor/Claude Code/statusline",
+  "transcript_path": "C:/Users/dev/.claude/projects/statusline/00000000.jsonl",
+  "cwd": "C:/Users/dev/projects/Claude Code/statusline",
   "prompt_id": "p_01H9",
   "permission_mode": "default",
   "agent_id": "main",
   "agent_type": "main",
-  "effort": { "level": "high" },
-  "model": { "id": "claude-opus-5[1m]", "display_name": "Opus 5" },
+  "effort": {
+    "level": "high"
+  },
+  "model": {
+    "id": "claude-opus-5[1m]",
+    "display_name": "Opus 5"
+  },
   "workspace": {
-    "current_dir": "C:/Users/marku/.cursor/Claude Code/statusline",
-    "project_dir": "C:/Users/marku/.cursor/Claude Code",
+    "current_dir": "C:/Users/dev/projects/Claude Code/statusline",
+    "project_dir": "C:/Users/dev/projects/Claude Code",
     "added_dirs": [],
     "git_worktree": "feat/statusline-builder",
     "repo": "statusline"
   },
   "version": "2.1.227",
-  "output_style": { "name": "default" },
+  "output_style": {
+    "name": "default"
+  },
   "cost": {
     "total_cost_usd": 1.2345,
     "total_duration_ms": 905000,
@@ -40,11 +47,23 @@
   },
   "exceeds_200k_tokens": false,
   "fast_mode": false,
-  "thinking": { "enabled": true },
-  "rate_limits": {
-    "five_hour": { "used_percentage": 1.2, "resets_at": 1786460040 },
-    "seven_day": { "used_percentage": 32.4, "resets_at": 1786788000 }
+  "thinking": {
+    "enabled": true
   },
-  "vim": { "mode": "INSERT" },
-  "agent": { "name": "main" }
+  "rate_limits": {
+    "five_hour": {
+      "used_percentage": 1.2,
+      "resets_at": 1786460040
+    },
+    "seven_day": {
+      "used_percentage": 32.4,
+      "resets_at": 1786788000
+    }
+  },
+  "vim": {
+    "mode": "INSERT"
+  },
+  "agent": {
+    "name": "main"
+  }
 }

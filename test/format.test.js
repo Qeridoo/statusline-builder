@@ -36,12 +36,12 @@ test('fmtCountdown takes milliseconds and returns now when elapsed', () => {
 });
 
 test('fmtPath handles windows separators', () => {
-  const p = 'C:/Users/marku/.cursor/Claude Code/statusline';
+  const p = 'C:/Users/dev/projects/Claude Code/statusline';
   assert.equal(fmtPath(p, { mode: 'basename' }), 'statusline');
   assert.equal(fmtPath(p, { mode: 'last2' }), 'Claude Code/statusline');
   assert.equal(fmtPath(p, { mode: 'full' }), p);
-  assert.equal(fmtPath('C:\\Users\\marku\\proj', { mode: 'basename' }), 'proj');
-  assert.equal(fmtPath(p, { mode: 'tilde' }), '~/.cursor/Claude Code/statusline');
+  assert.equal(fmtPath('C:\\Users\\dev\\proj', { mode: 'basename' }), 'proj');
+  assert.equal(fmtPath(p, { mode: 'tilde' }), '~/projects/Claude Code/statusline');
 });
 
 test('fmtPercent respects decimals and sign', () => {

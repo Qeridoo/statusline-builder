@@ -1,11 +1,22 @@
 {
   "name": "statusline-builder",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "description": "Compose a Claude Code status line and export a runnable script",
   "scripts": {
     "test": "node --test",
     "build": "node build.js"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Qeridoo/statusline-builder.git"
+  },
+  "keywords": [
+    "claude-code",
+    "statusline",
+    "cli",
+    "terminal",
+    "ansi"
+  ]
 }

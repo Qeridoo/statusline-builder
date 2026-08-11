@@ -50,7 +50,7 @@ A payload matching the schema in the spec, with `rate_limits.seven_day.used_perc
 `five_hour.used_percentage` 1.2, `context_window.used_percentage` 10.4,
 `cost.total_lines_added` 503, `total_lines_removed` 16, `effort.level` high,
 `model.display_name` "Opus 5", `session_name` "statusline-builder",
-`workspace.project_dir` "C:/Users/marku/.cursor/Claude Code".
+`workspace.project_dir` "C:/Users/dev/projects/Claude Code".
 `resets_at` values written as epoch seconds.
 
 - [ ] **Step 3: Verify the fixture parses**
@@ -114,7 +114,7 @@ test('fmtCountdown returns now when elapsed', () => {
 });
 
 test('fmtPath handles windows separators', () => {
-  const p = 'C:/Users/marku/.cursor/Claude Code/statusline';
+  const p = 'C:/Users/dev/projects/Claude Code/statusline';
   assert.equal(fmtPath(p, { mode: 'basename' }), 'statusline');
   assert.equal(fmtPath(p, { mode: 'last2' }), 'Claude Code/statusline');
 });

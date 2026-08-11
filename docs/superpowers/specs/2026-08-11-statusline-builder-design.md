@@ -28,7 +28,7 @@ ordering and styling segments, with a live preview, and that exports:
 The generated status line is a **Node script**, invoked as:
 
 ```json
-{ "statusLine": { "type": "command", "command": "node C:/Users/marku/.claude/statusline.js" } }
+{ "statusLine": { "type": "command", "command": "node C:/Users/<you>/.claude/statusline.js" } }
 ```
 
 Measured on this machine: Node cold start ~80 ms; `bash` alone ~68 ms before any
