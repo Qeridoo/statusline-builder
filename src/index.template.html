@@ -111,18 +111,34 @@
       </div>
       <p class="hint" id="export-hint"></p>
       <div class="install">
+        <div class="install__top">
+          <h3 class="panel__title">Installation</h3>
+          <span class="panel__spacer"></span>
+          <div class="os-switch" role="group" aria-label="Betriebssystem">
+            <button class="os" type="button" data-os="windows">Windows</button>
+            <button class="os" type="button" data-os="macos">macOS</button>
+            <button class="os" type="button" data-os="linux">Linux</button>
+          </div>
+        </div>
+
         <label class="field control install__path">
           <span>Zielpfad</span>
           <input type="text" id="install-path" spellcheck="false" />
         </label>
 
-        <p class="hint"><b>1.</b> Oben <b>Kopieren</b> drücken. <b>2.</b> Diese Zeile in PowerShell ausführen — sie schreibt die Zwischenablage direkt in die Datei, ganz ohne Download:</p>
-        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="PowerShell-Befehl zum Speichern"></textarea>
+        <p class="hint"><b>1.</b> Skript in die Zwischenablage. Der Knopf nimmt immer den Inhalt von <code>statusline.js</code> — unabhängig davon, welcher Tab oben offen ist.</p>
+        <button class="btn btn--primary install__btn" type="button" id="copy-script">Skript kopieren</button>
+
+        <p class="hint"><b>2.</b> Zwischenablage in die Datei schreiben, in <span id="shell-name">PowerShell</span>:</p>
+        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="Befehl zum Speichern"></textarea>
         <button class="btn btn--small install__btn" type="button" id="copy-command">Befehl kopieren</button>
 
-        <p class="hint"><b>3.</b> Das hier in <code>~/.claude/settings.json</code> eintragen:</p>
+        <p class="hint"><b>3.</b> In <code>~/.claude/settings.json</code> eintragen:</p>
         <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
-        <p class="hint">Eine vorhandene <code>statusline.sh</code> muss nicht angefasst werden — sobald <code>settings.json</code> auf das Node-Skript zeigt, wird sie nicht mehr aufgerufen. Kein <code>jq</code> nötig.</p>
+        <p class="hint hint--warn">Der Befehl muss mit <code>node</code> beginnen. Kommst du von einer <code>statusline.sh</code>, steht dort noch <code>bash</code> — dann läuft weiter das alte Skript und die Leiste bleibt leer. Die <code>.sh</code> selbst kann liegen bleiben.</p>
+
+        <p class="hint"><b>4.</b> Gegenprobe — die erste Zeile der Datei muss <code>#!/usr/bin/env node</code> sein. Steht dort <code>{</code>, wurde versehentlich der <b>Config</b>-Tab kopiert statt <b>statusline.js</b>:</p>
+        <textarea class="code code--line" id="verify-command" spellcheck="false" readonly aria-label="Befehl zum Prüfen"></textarea>
       </div>
     </div>
   </section>

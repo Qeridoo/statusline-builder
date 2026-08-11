@@ -4,8 +4,9 @@ import { renderHtml } from './render.js';
 import { getState, patch, toConfig } from './state.js';
 import { todayLeft, pace, evenBurn } from './derive.js';
 import {
-  generateScript, generatePrompt, generateConfigJson,
-  parseAnyConfig, generateSettingsSnippet, DEFAULT_INSTALL_PATH
+  generateScript, generatePrompt, generateConfigJson, parseAnyConfig,
+  generateSettingsSnippet, writeToFileCommand, verifyCommand,
+  SHELL_NAMES, INSTALL_PATHS
 } from './generate.js';
 
 const HOUR = 3600 * 1000;
@@ -44,15 +45,15 @@ export function renderPreview(el, readoutEl) {
 }
 
 const HINTS = {
-  script: 'Datei speichern und in settings.json darauf zeigen. Läuft mit purem Node, ohne jq.',
+  script: 'Das ist die Datei, die installiert wird. Unten Schritt für Schritt.',
   prompt: 'An Claude geben — enthält Segmentliste, Regeln und die fertige Config.',
-  config: 'Kompakte Sicherung der Einstellungen. Zum Zurückladen den Tab „Laden" nehmen.',
+  config: 'Nur eine Sicherung der Einstellungen — NICHT die Datei, die installiert wird. Zum Zurückladen den Tab „Laden" nehmen.',
   load: 'Bestehendes statusline.js oder eine Config einfügen bzw. Datei wählen, dann Übernehmen.'
 };
 
 const LOAD_PLACEHOLDER =
   'Hier ein erzeugtes statusline.js einfügen (der CFG-Block wird ausgelesen) oder eine Config-JSON.\n' +
-  'Alternativ oben eine Datei wählen — z. B. C:/Users/<du>/.claude/statusline.js';
+  'Alternativ oben eine Datei wählen — z. B. ~/.claude/statusline.js';
 
 export function exportText(tab) {
   const config = toConfig();
@@ -73,13 +74,6 @@ export function inIframe() {
   } catch {
     return true;
   }
-}
-
-// A PowerShell one-liner that writes the clipboard straight to the target file.
-// The artifact sandbox can block downloads outright, and this needs none.
-export function installCommand(installPath) {
-  const windowsPath = String(installPath || DEFAULT_INSTALL_PATH).replace(/\//g, '\\');
-  return 'Get-Clipboard -Raw | Set-Content -Encoding utf8 "' + windowsPath + '"';
 }
 
 export function download(tab, text) {
@@ -158,15 +152,10 @@ export function mountExport(dom, rebuild) {
         // Selecting is a convenience; ignore browsers that refuse it.
       }
       dom.hint.textContent =
-        'Kommt kein Download an, blockiert ihn die Sandbox. Der Text ist jetzt markiert — ' +
-        'Strg+C, dann den PowerShell-Befehl unten ausführen.';
+        'Kommt kein Download an, blockiert ihn die Sandbox. Nimm die vier Schritte unten — ' +
+        'die brauchen keinen Download.';
     }
   });
-
-  if (dom.copyCommand) {
-    dom.copyCommand.addEventListener('click', () =>
-      copyText(installCommand(getState().installPath), dom.copyCommand, dom.installCommand));
-  }
 
   dom.import.addEventListener('click', () => {
     let config;
@@ -197,11 +186,33 @@ export function mountExport(dom, rebuild) {
     });
   }
 
+  // Always the script, never whatever tab happens to be open — copying the
+  // Config tab by mistake produces a file Node cannot run.
+  if (dom.copyScript) {
+    dom.copyScript.addEventListener('click', () =>
+      copyText(exportText('script'), dom.copyScript, null));
+  }
+
+  if (dom.copyCommand) {
+    dom.copyCommand.addEventListener('click', () => {
+      const { os, installPath } = getState();
+      copyText(writeToFileCommand(os, installPath), dom.copyCommand, dom.installCommand);
+    });
+  }
+
+  dom.osButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const os = button.dataset.os;
+      // Switching platform swaps in that platform's conventional path.
+      patch({ os, installPath: INSTALL_PATHS[os] });
+    });
+  });
+
   dom.installPath.addEventListener('input', () => patch({ installPath: dom.installPath.value }));
 }
 
 export function renderExport(dom) {
-  const { tab, installPath } = getState();
+  const { tab, installPath, os } = getState();
   const tabChanged = tab !== lastTab;
   lastTab = tab;
 
@@ -231,7 +242,13 @@ export function renderExport(dom) {
   if (dom.loadControls) dom.loadControls.hidden = tab !== 'load';
   if (tabChanged) dom.hint.textContent = HINTS[tab];
 
+  dom.osButtons.forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.os === os));
+  });
+
   if (document.activeElement !== dom.installPath) dom.installPath.value = installPath;
-  dom.snippet.value = generateSettingsSnippet(installPath);
-  if (dom.installCommand) dom.installCommand.value = installCommand(installPath);
+  dom.snippet.value = generateSettingsSnippet(installPath, os);
+  if (dom.installCommand) dom.installCommand.value = writeToFileCommand(os, installPath);
+  if (dom.verifyCommand) dom.verifyCommand.value = verifyCommand(os, installPath);
+  if (dom.shellName) dom.shellName.textContent = SHELL_NAMES[os] || 'Terminal';
 }

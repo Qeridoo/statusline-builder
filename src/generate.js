@@ -221,9 +221,55 @@ export function generatePrompt(config, opts = {}) {
   ].join('\n');
 }
 
-export function generateSettingsSnippet(installPath) {
+// ---- installation helpers, per operating system ----
+
+export const OSES = ['windows', 'macos', 'linux'];
+
+export const INSTALL_PATHS = {
+  windows: DEFAULT_INSTALL_PATH,
+  macos: '~/.claude/statusline.js',
+  linux: '~/.claude/statusline.js'
+};
+
+export const SHELL_NAMES = { windows: 'PowerShell', macos: 'Terminal', linux: 'Terminal' };
+
+const toWindowsPath = p => String(p).replace(/\//g, '\\');
+const toPosixPath = p => String(p).replace(/\\/g, '/');
+
+// A tilde has to survive unquoted or it will not expand, so it becomes $HOME —
+// that expands inside double quotes and still tolerates spaces in the path.
+function posixTarget(p) {
+  const path = toPosixPath(p);
+  return path.startsWith('~') ? '"$HOME' + path.slice(1) + '"' : '"' + path + '"';
+}
+
+export function shellQuote(path) {
+  const p = String(path);
+  if (p.startsWith('~')) return p;
+  return /\s/.test(p) ? '"' + p + '"' : p;
+}
+
+// Writes the clipboard straight into the target file — no download involved.
+export function writeToFileCommand(os, installPath) {
+  const path = installPath || INSTALL_PATHS[os] || DEFAULT_INSTALL_PATH;
+  if (os === 'macos') return 'pbpaste > ' + posixTarget(path);
+  if (os === 'linux') return 'xclip -selection clipboard -o > ' + posixTarget(path);
+  return 'Get-Clipboard -Raw | Set-Content -Encoding utf8 "' + toWindowsPath(path) + '"';
+}
+
+// Prints the first line, which must be the node shebang. A leading brace means
+// the config was copied instead of the script.
+export function verifyCommand(os, installPath) {
+  const path = installPath || INSTALL_PATHS[os] || DEFAULT_INSTALL_PATH;
+  if (os === 'windows') return 'Get-Content "' + toWindowsPath(path) + '" -TotalCount 1';
+  return 'head -1 ' + posixTarget(path);
+}
+
+export function generateSettingsSnippet(installPath, os) {
+  const path = installPath || INSTALL_PATHS[os] || DEFAULT_INSTALL_PATH;
+  const shown = os === 'macos' || os === 'linux' ? toPosixPath(path) : path;
   return JSON.stringify(
-    { statusLine: { type: 'command', command: 'node ' + (installPath || DEFAULT_INSTALL_PATH) } },
+    { statusLine: { type: 'command', command: 'node ' + shellQuote(shown) } },
     null,
     2
   );

@@ -22,6 +22,9 @@ const idsInTemplate = () => {
 const tabsInTemplate = () =>
   Array.from(template.matchAll(/class="tab"[^>]*data-tab="([^"]+)"/g)).map(m => m[1]);
 
+const osesInTemplate = () =>
+  Array.from(template.matchAll(/class="os"[^>]*data-os="([^"]+)"/g)).map(m => m[1]);
+
 function makeElement(tag = 'div') {
   const listeners = new Map();
   const node = {
@@ -85,13 +88,24 @@ function makeSandbox() {
     return tab;
   });
 
+  const osButtons = osesInTemplate().map(name => {
+    const button = makeElement('button');
+    button.dataset.os = name;
+    return button;
+  });
+
   const anchors = [];
+  const clipboard = [];
   const store = new Map();
   const document = {
     readyState: 'complete',
     activeElement: makeElement('body'),
     getElementById: id => (byId.has(id) ? byId.get(id) : null),
-    querySelectorAll: selector => (selector === '.tab' ? tabs : []),
+    querySelectorAll: selector => {
+      if (selector === '.tab') return tabs;
+      if (selector === '.os') return osButtons;
+      return [];
+    },
     createElement: tag => {
       const node = makeElement(tag);
       if (String(tag).toLowerCase() === 'a') anchors.push(node);
@@ -108,7 +122,7 @@ function makeSandbox() {
     console,
     setTimeout,
     clearTimeout,
-    navigator: { clipboard: { writeText: async () => {} } },
+    navigator: { clipboard: { writeText: async text => { clipboard.push(text); } } },
     localStorage: {
       getItem: key => (store.has(key) ? store.get(key) : null),
       setItem: (key, value) => store.set(key, value),
@@ -126,7 +140,7 @@ function makeSandbox() {
     JSON, Math, Date, Number, String, Boolean, Array, Object, Error, Set, Map, RegExp, Intl
   };
   sandbox.globalThis = sandbox;
-  return { sandbox, byId, tabs, store, anchors };
+  return { sandbox, byId, tabs, osButtons, store, anchors, clipboard };
 }
 
 const boot = () => {
@@ -413,4 +427,63 @@ test('downloads use a binary mime type so browsers keep the .js name', () => {
   byId.get('download').fire('click');
   assert.equal(anchors[0].download, 'statusline.js');
   assert.equal(anchors[0].clicks, 1);
+});
+
+// ---- platform-aware install instructions ----
+
+test('the install copy button takes the script even when Config is showing', () => {
+  const { byId, tabs, clipboard } = boot();
+  tabs.find(t => t.dataset.tab === 'config').fire('click');
+  assert.match(byId.get('export-out').value, /^\{/, 'config tab should show the config');
+
+  byId.get('copy-script').fire('click');
+  assert.match(clipboard[clipboard.length - 1], /^#!\/usr\/bin\/env node/);
+});
+
+test('macOS gets pbpaste, a tilde path and a shell-expandable settings command', () => {
+  const { byId, osButtons } = boot();
+  osButtons.find(b => b.dataset.os === 'macos').fire('click');
+
+  assert.equal(byId.get('install-path').value, '~/.claude/statusline.js');
+  assert.equal(byId.get('install-command').value, 'pbpaste > "$HOME/.claude/statusline.js"');
+  assert.equal(byId.get('verify-command').value, 'head -1 "$HOME/.claude/statusline.js"');
+  assert.match(byId.get('settings-snippet').value, /"node ~\/\.claude\/statusline\.js"/);
+  assert.equal(byId.get('shell-name').textContent, 'Terminal');
+});
+
+test('Linux gets xclip', () => {
+  const { byId, osButtons } = boot();
+  osButtons.find(b => b.dataset.os === 'linux').fire('click');
+  assert.match(byId.get('install-command').value, /^xclip -selection clipboard -o > "\$HOME/);
+});
+
+test('Windows gets PowerShell with backslashes', () => {
+  const { byId, osButtons } = boot();
+  osButtons.find(b => b.dataset.os === 'macos').fire('click');
+  osButtons.find(b => b.dataset.os === 'windows').fire('click');
+
+  const backslash = String.fromCharCode(92);
+  assert.match(byId.get('install-command').value, /^Get-Clipboard -Raw \| Set-Content -Encoding utf8 "C:/);
+  assert.ok(byId.get('install-command').value.includes(backslash + '.claude' + backslash));
+  assert.match(byId.get('verify-command').value, /-TotalCount 1$/);
+  assert.equal(byId.get('shell-name').textContent, 'PowerShell');
+});
+
+test('the active platform is marked on its button', () => {
+  const { byId, osButtons } = boot();
+  osButtons.find(b => b.dataset.os === 'macos').fire('click');
+  assert.deepEqual(
+    osButtons.map(b => b.getAttribute('aria-pressed')),
+    ['false', 'true', 'false']
+  );
+});
+
+test('the settings snippet always invokes node, never bash', () => {
+  const { byId, osButtons } = boot();
+  for (const os of ['windows', 'macos', 'linux']) {
+    osButtons.find(b => b.dataset.os === os).fire('click');
+    const command = JSON.parse(byId.get('settings-snippet').value).statusLine.command;
+    assert.ok(command.startsWith('node '), os + ': ' + command);
+    assert.equal(command.includes('bash'), false);
+  }
 });

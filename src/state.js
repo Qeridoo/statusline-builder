@@ -1,13 +1,27 @@
 // One state object, one persistence key, one notification channel.
 
 import { CATALOG_BY_ID, REFERENCE_ORDER, isBlock } from './catalog.js';
-import { DEFAULT_INSTALL_PATH, MAX_LINES } from './generate.js';
+import { DEFAULT_INSTALL_PATH, MAX_LINES, INSTALL_PATHS } from './generate.js';
 import { DEFAULT_SEPARATOR } from './render.js';
 
 const KEY = 'statusline-builder:v1';
 
+export function detectOs() {
+  try {
+    const ua = String((navigator.userAgent || '') + ' ' + (navigator.platform || '')).toLowerCase();
+    if (ua.includes('mac')) return 'macos';
+    if (ua.includes('win')) return 'windows';
+    if (ua.includes('linux') || ua.includes('x11') || ua.includes('android')) return 'linux';
+  } catch {
+    // No navigator (tests, odd embeddings) — Windows is the safe default here.
+  }
+  return 'windows';
+}
+
 export function defaultState() {
+  const os = detectOs();
   return {
+    os,
     segments: REFERENCE_ORDER.map(id => ({ ...CATALOG_BY_ID[id] })),
     separator: DEFAULT_SEPARATOR,
     separators: Array.from({ length: MAX_LINES }, () => DEFAULT_SEPARATOR),
@@ -15,7 +29,7 @@ export function defaultState() {
     lineCount: 1,
     sort: 'manual',
     preview: { ctx: 10, fiveHour: 1, sevenDay: 32 },
-    installPath: DEFAULT_INSTALL_PATH,
+    installPath: INSTALL_PATHS[os] || DEFAULT_INSTALL_PATH,
     tab: 'script',
     loadDraft: ''
   };

@@ -144,7 +144,11 @@ export function mount() {
     loadFileName: document.getElementById('load-file-name'),
     installPath: document.getElementById('install-path'),
     installCommand: document.getElementById('install-command'),
+    verifyCommand: document.getElementById('verify-command'),
+    shellName: document.getElementById('shell-name'),
+    copyScript: document.getElementById('copy-script'),
     copyCommand: document.getElementById('copy-command'),
+    osButtons: Array.from(document.querySelectorAll('.os')),
     snippet: document.getElementById('settings-snippet'),
     sliders: [
       ['ctx', document.getElementById('pv-ctx'), document.getElementById('pv-ctx-out')],

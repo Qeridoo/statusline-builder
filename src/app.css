@@ -15,6 +15,7 @@
   --term-bg: #16151d;
   --term-ink: #d8d5e4;
   --danger: #b3261e;
+  --warn: #a06a12;
 
   --radius: 8px;
   --gap: 14px;
@@ -38,6 +39,7 @@
     --term-bg: #0e0d14;
     --term-ink: #d8d5e4;
     --danger: #f2837c;
+    --warn: #e0a83f;
   }
 }
 
@@ -56,6 +58,7 @@
   --term-bg: #0e0d14;
   --term-ink: #d8d5e4;
   --danger: #f2837c;
+  --warn: #e0a83f;
 }
 
 * { box-sizing: border-box; }
@@ -548,3 +551,38 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .install__btn { align-self: flex-start; }
 
 .install .hint b { color: var(--ink-2); font-weight: 700; }
+
+/* ---------- install block ---------- */
+
+.install__top { display: flex; align-items: center; gap: 8px; }
+
+.os-switch {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.os {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px 11px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.os + .os { border-left: 1px solid var(--line); }
+.os:hover { color: var(--ink); }
+
+.os[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.hint--warn {
+  border-left: 2px solid var(--warn);
+  padding-left: 10px;
+  color: var(--ink-2);
+}

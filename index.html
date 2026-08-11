@@ -17,6 +17,7 @@
   --term-bg: #16151d;
   --term-ink: #d8d5e4;
   --danger: #b3261e;
+  --warn: #a06a12;
 
   --radius: 8px;
   --gap: 14px;
@@ -40,6 +41,7 @@
     --term-bg: #0e0d14;
     --term-ink: #d8d5e4;
     --danger: #f2837c;
+    --warn: #e0a83f;
   }
 }
 
@@ -58,6 +60,7 @@
   --term-bg: #0e0d14;
   --term-ink: #d8d5e4;
   --danger: #f2837c;
+  --warn: #e0a83f;
 }
 
 * { box-sizing: border-box; }
@@ -550,6 +553,41 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .install__btn { align-self: flex-start; }
 
 .install .hint b { color: var(--ink-2); font-weight: 700; }
+
+/* ---------- install block ---------- */
+
+.install__top { display: flex; align-items: center; gap: 8px; }
+
+.os-switch {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.os {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px 11px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.os + .os { border-left: 1px solid var(--line); }
+.os:hover { color: var(--ink); }
+
+.os[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.hint--warn {
+  border-left: 2px solid var(--warn);
+  padding-left: 10px;
+  color: var(--ink-2);
+}
 </style>
 
 <header class="proof">
@@ -662,18 +700,34 @@ button, select, input, textarea { font: inherit; color: inherit; }
       </div>
       <p class="hint" id="export-hint"></p>
       <div class="install">
+        <div class="install__top">
+          <h3 class="panel__title">Installation</h3>
+          <span class="panel__spacer"></span>
+          <div class="os-switch" role="group" aria-label="Betriebssystem">
+            <button class="os" type="button" data-os="windows">Windows</button>
+            <button class="os" type="button" data-os="macos">macOS</button>
+            <button class="os" type="button" data-os="linux">Linux</button>
+          </div>
+        </div>
+
         <label class="field control install__path">
           <span>Zielpfad</span>
           <input type="text" id="install-path" spellcheck="false" />
         </label>
 
-        <p class="hint"><b>1.</b> Oben <b>Kopieren</b> drücken. <b>2.</b> Diese Zeile in PowerShell ausführen — sie schreibt die Zwischenablage direkt in die Datei, ganz ohne Download:</p>
-        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="PowerShell-Befehl zum Speichern"></textarea>
+        <p class="hint"><b>1.</b> Skript in die Zwischenablage. Der Knopf nimmt immer den Inhalt von <code>statusline.js</code> — unabhängig davon, welcher Tab oben offen ist.</p>
+        <button class="btn btn--primary install__btn" type="button" id="copy-script">Skript kopieren</button>
+
+        <p class="hint"><b>2.</b> Zwischenablage in die Datei schreiben, in <span id="shell-name">PowerShell</span>:</p>
+        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="Befehl zum Speichern"></textarea>
         <button class="btn btn--small install__btn" type="button" id="copy-command">Befehl kopieren</button>
 
-        <p class="hint"><b>3.</b> Das hier in <code>~/.claude/settings.json</code> eintragen:</p>
+        <p class="hint"><b>3.</b> In <code>~/.claude/settings.json</code> eintragen:</p>
         <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
-        <p class="hint">Eine vorhandene <code>statusline.sh</code> muss nicht angefasst werden — sobald <code>settings.json</code> auf das Node-Skript zeigt, wird sie nicht mehr aufgerufen. Kein <code>jq</code> nötig.</p>
+        <p class="hint hint--warn">Der Befehl muss mit <code>node</code> beginnen. Kommst du von einer <code>statusline.sh</code>, steht dort noch <code>bash</code> — dann läuft weiter das alte Skript und die Leiste bleibt leer. Die <code>.sh</code> selbst kann liegen bleiben.</p>
+
+        <p class="hint"><b>4.</b> Gegenprobe — die erste Zeile der Datei muss <code>#!/usr/bin/env node</code> sein. Steht dort <code>{</code>, wurde versehentlich der <b>Config</b>-Tab kopiert statt <b>statusline.js</b>:</p>
+        <textarea class="code code--line" id="verify-command" spellcheck="false" readonly aria-label="Befehl zum Prüfen"></textarea>
       </div>
     </div>
   </section>
@@ -1909,9 +1963,55 @@ function generatePrompt(config, opts = {}) {
   ].join('\n');
 }
 
-function generateSettingsSnippet(installPath) {
+// ---- installation helpers, per operating system ----
+
+const OSES = ['windows', 'macos', 'linux'];
+
+const INSTALL_PATHS = {
+  windows: DEFAULT_INSTALL_PATH,
+  macos: '~/.claude/statusline.js',
+  linux: '~/.claude/statusline.js'
+};
+
+const SHELL_NAMES = { windows: 'PowerShell', macos: 'Terminal', linux: 'Terminal' };
+
+const toWindowsPath = p => String(p).replace(/\//g, '\\');
+const toPosixPath = p => String(p).replace(/\\/g, '/');
+
+// A tilde has to survive unquoted or it will not expand, so it becomes $HOME —
+// that expands inside double quotes and still tolerates spaces in the path.
+function posixTarget(p) {
+  const path = toPosixPath(p);
+  return path.startsWith('~') ? '"$HOME' + path.slice(1) + '"' : '"' + path + '"';
+}
+
+function shellQuote(path) {
+  const p = String(path);
+  if (p.startsWith('~')) return p;
+  return /\s/.test(p) ? '"' + p + '"' : p;
+}
+
+// Writes the clipboard straight into the target file — no download involved.
+function writeToFileCommand(os, installPath) {
+  const path = installPath || INSTALL_PATHS[os] || DEFAULT_INSTALL_PATH;
+  if (os === 'macos') return 'pbpaste > ' + posixTarget(path);
+  if (os === 'linux') return 'xclip -selection clipboard -o > ' + posixTarget(path);
+  return 'Get-Clipboard -Raw | Set-Content -Encoding utf8 "' + toWindowsPath(path) + '"';
+}
+
+// Prints the first line, which must be the node shebang. A leading brace means
+// the config was copied instead of the script.
+function verifyCommand(os, installPath) {
+  const path = installPath || INSTALL_PATHS[os] || DEFAULT_INSTALL_PATH;
+  if (os === 'windows') return 'Get-Content "' + toWindowsPath(path) + '" -TotalCount 1';
+  return 'head -1 ' + posixTarget(path);
+}
+
+function generateSettingsSnippet(installPath, os) {
+  const path = installPath || INSTALL_PATHS[os] || DEFAULT_INSTALL_PATH;
+  const shown = os === 'macos' || os === 'linux' ? toPosixPath(path) : path;
   return JSON.stringify(
-    { statusLine: { type: 'command', command: 'node ' + (installPath || DEFAULT_INSTALL_PATH) } },
+    { statusLine: { type: 'command', command: 'node ' + shellQuote(shown) } },
     null,
     2
   );
@@ -1923,8 +2023,22 @@ function generateSettingsSnippet(installPath) {
 
 const KEY = 'statusline-builder:v1';
 
+function detectOs() {
+  try {
+    const ua = String((navigator.userAgent || '') + ' ' + (navigator.platform || '')).toLowerCase();
+    if (ua.includes('mac')) return 'macos';
+    if (ua.includes('win')) return 'windows';
+    if (ua.includes('linux') || ua.includes('x11') || ua.includes('android')) return 'linux';
+  } catch {
+    // No navigator (tests, odd embeddings) — Windows is the safe default here.
+  }
+  return 'windows';
+}
+
 function defaultState() {
+  const os = detectOs();
   return {
+    os,
     segments: REFERENCE_ORDER.map(id => ({ ...CATALOG_BY_ID[id] })),
     separator: DEFAULT_SEPARATOR,
     separators: Array.from({ length: MAX_LINES }, () => DEFAULT_SEPARATOR),
@@ -1932,7 +2046,7 @@ function defaultState() {
     lineCount: 1,
     sort: 'manual',
     preview: { ctx: 10, fiveHour: 1, sevenDay: 32 },
-    installPath: DEFAULT_INSTALL_PATH,
+    installPath: INSTALL_PATHS[os] || DEFAULT_INSTALL_PATH,
     tab: 'script',
     loadDraft: ''
   };
@@ -2057,15 +2171,15 @@ function renderPreview(el, readoutEl) {
 }
 
 const HINTS = {
-  script: 'Datei speichern und in settings.json darauf zeigen. Läuft mit purem Node, ohne jq.',
+  script: 'Das ist die Datei, die installiert wird. Unten Schritt für Schritt.',
   prompt: 'An Claude geben — enthält Segmentliste, Regeln und die fertige Config.',
-  config: 'Kompakte Sicherung der Einstellungen. Zum Zurückladen den Tab „Laden" nehmen.',
+  config: 'Nur eine Sicherung der Einstellungen — NICHT die Datei, die installiert wird. Zum Zurückladen den Tab „Laden" nehmen.',
   load: 'Bestehendes statusline.js oder eine Config einfügen bzw. Datei wählen, dann Übernehmen.'
 };
 
 const LOAD_PLACEHOLDER =
   'Hier ein erzeugtes statusline.js einfügen (der CFG-Block wird ausgelesen) oder eine Config-JSON.\n' +
-  'Alternativ oben eine Datei wählen — z. B. C:/Users/<du>/.claude/statusline.js';
+  'Alternativ oben eine Datei wählen — z. B. ~/.claude/statusline.js';
 
 function exportText(tab) {
   const config = toConfig();
@@ -2086,13 +2200,6 @@ function inIframe() {
   } catch {
     return true;
   }
-}
-
-// A PowerShell one-liner that writes the clipboard straight to the target file.
-// The artifact sandbox can block downloads outright, and this needs none.
-function installCommand(installPath) {
-  const windowsPath = String(installPath || DEFAULT_INSTALL_PATH).replace(/\//g, '\\');
-  return 'Get-Clipboard -Raw | Set-Content -Encoding utf8 "' + windowsPath + '"';
 }
 
 function download(tab, text) {
@@ -2171,15 +2278,10 @@ function mountExport(dom, rebuild) {
         // Selecting is a convenience; ignore browsers that refuse it.
       }
       dom.hint.textContent =
-        'Kommt kein Download an, blockiert ihn die Sandbox. Der Text ist jetzt markiert — ' +
-        'Strg+C, dann den PowerShell-Befehl unten ausführen.';
+        'Kommt kein Download an, blockiert ihn die Sandbox. Nimm die vier Schritte unten — ' +
+        'die brauchen keinen Download.';
     }
   });
-
-  if (dom.copyCommand) {
-    dom.copyCommand.addEventListener('click', () =>
-      copyText(installCommand(getState().installPath), dom.copyCommand, dom.installCommand));
-  }
 
   dom.import.addEventListener('click', () => {
     let config;
@@ -2210,11 +2312,33 @@ function mountExport(dom, rebuild) {
     });
   }
 
+  // Always the script, never whatever tab happens to be open — copying the
+  // Config tab by mistake produces a file Node cannot run.
+  if (dom.copyScript) {
+    dom.copyScript.addEventListener('click', () =>
+      copyText(exportText('script'), dom.copyScript, null));
+  }
+
+  if (dom.copyCommand) {
+    dom.copyCommand.addEventListener('click', () => {
+      const { os, installPath } = getState();
+      copyText(writeToFileCommand(os, installPath), dom.copyCommand, dom.installCommand);
+    });
+  }
+
+  dom.osButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const os = button.dataset.os;
+      // Switching platform swaps in that platform's conventional path.
+      patch({ os, installPath: INSTALL_PATHS[os] });
+    });
+  });
+
   dom.installPath.addEventListener('input', () => patch({ installPath: dom.installPath.value }));
 }
 
 function renderExport(dom) {
-  const { tab, installPath } = getState();
+  const { tab, installPath, os } = getState();
   const tabChanged = tab !== lastTab;
   lastTab = tab;
 
@@ -2244,9 +2368,15 @@ function renderExport(dom) {
   if (dom.loadControls) dom.loadControls.hidden = tab !== 'load';
   if (tabChanged) dom.hint.textContent = HINTS[tab];
 
+  dom.osButtons.forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.os === os));
+  });
+
   if (document.activeElement !== dom.installPath) dom.installPath.value = installPath;
-  dom.snippet.value = generateSettingsSnippet(installPath);
-  if (dom.installCommand) dom.installCommand.value = installCommand(installPath);
+  dom.snippet.value = generateSettingsSnippet(installPath, os);
+  if (dom.installCommand) dom.installCommand.value = writeToFileCommand(os, installPath);
+  if (dom.verifyCommand) dom.verifyCommand.value = verifyCommand(os, installPath);
+  if (dom.shellName) dom.shellName.textContent = SHELL_NAMES[os] || 'Terminal';
 }
 
 // ---------- src/ui.js ----------
@@ -2390,7 +2520,11 @@ function mount() {
     loadFileName: document.getElementById('load-file-name'),
     installPath: document.getElementById('install-path'),
     installCommand: document.getElementById('install-command'),
+    verifyCommand: document.getElementById('verify-command'),
+    shellName: document.getElementById('shell-name'),
+    copyScript: document.getElementById('copy-script'),
     copyCommand: document.getElementById('copy-command'),
+    osButtons: Array.from(document.querySelectorAll('.os')),
     snippet: document.getElementById('settings-snippet'),
     sliders: [
       ['ctx', document.getElementById('pv-ctx'), document.getElementById('pv-ctx-out')],

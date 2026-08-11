@@ -46,19 +46,53 @@ The generated script is plain Node with no dependencies. Measured on Windows 11:
 
 ## Install
 
-1. Build the line in the app, then copy the **statusline.js** tab.
-2. Save it as `~/.claude/statusline.js` (on Windows, e.g. `C:/Users/<you>/.claude/statusline.js`).
-3. Point `~/.claude/settings.json` at it:
+The app's install block walks through this with the right commands for your
+platform; pick Windows, macOS or Linux at its top. The steps are:
+
+**1. Copy the script.** Use the **Skript kopieren** button in the install block, not
+the copy button above the tabs. It always takes the generated script, whichever tab
+happens to be open — copying the **Config** tab by mistake writes a JSON file that
+Node cannot run.
+
+**2. Write it to the file.** No download needed; these read the clipboard directly:
+
+| Platform | Command |
+|---|---|
+| Windows (PowerShell) | `Get-Clipboard -Raw \| Set-Content -Encoding utf8 "C:\Users\<you>\.claude\statusline.js"` |
+| macOS | `pbpaste > "$HOME/.claude/statusline.js"` |
+| Linux (X11) | `xclip -selection clipboard -o > "$HOME/.claude/statusline.js"` |
+
+On Wayland, `wl-paste` replaces `xclip -selection clipboard -o`.
+
+**3. Point `~/.claude/settings.json` at it.**
 
 ```json
 "statusLine": {
   "type": "command",
-  "command": "node C:/Users/<you>/.claude/statusline.js"
+  "command": "node \"C:/Users/<you>/.claude/statusline.js\""
 }
 ```
 
+On macOS and Linux `node ~/.claude/statusline.js` is enough — the command runs
+through a shell, which expands the tilde. On Windows it does not, so use the full
+path there.
+
+The command must start with `node`. Coming from a `bash …/statusline.sh` entry, it
+is easy to change only the path and leave `bash` in place; then the old script keeps
+running and the line stays blank. The `.sh` itself can stay where it is — once
+`settings.json` points elsewhere, nothing calls it.
+
+**4. Check it.** The first line of the file must be `#!/usr/bin/env node`:
+
+```bash
+head -1 ~/.claude/statusline.js                                  # macOS, Linux
+Get-Content "C:\Users\<you>\.claude\statusline.js" -TotalCount 1  # Windows
+```
+
+A leading `{` means the Config tab was copied instead of the script.
+
 Everything configurable in the generated file lives in the `CFG` object at the top,
-so it stays editable by hand afterwards.
+so it stays editable by hand — and the **Laden** tab reads it back in.
 
 ## The payload
 
@@ -119,7 +153,7 @@ number to trust for the week as a whole.
 ## Development
 
 ```bash
-npm test        # node --test — 99 tests
+npm test        # node --test — 108 tests
 node build.js   # regenerates index.html from src/
 ./test.sh path/to/statusline.js   # pipes sample-payload.json through a generated script
 ```
