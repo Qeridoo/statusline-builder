@@ -1,23 +1,33 @@
-// The three export formats: a runnable script, a handover prompt, and a config
-// file that can be read back in.
+// The export formats: a runnable script, a handover prompt, and a config file —
+// plus the readers that turn any of those back into a config.
 
 import { RUNTIME_SOURCE } from './runtime.js';
-import { CATALOG_BY_ID } from './catalog.js';
+import { CATALOG_BY_ID, isBlock } from './catalog.js';
+import { DEFAULT_SEPARATOR } from './render.js';
 
 const SEGMENT_KEYS = [
   'id', 'label', 'emoji', 'source', 'format', 'showLabel', 'showEmoji',
-  'line', 'color', 'hideValues', 'scaleMap', 'bold', 'dim'
+  'line', 'color', 'hideValues', 'scaleMap', 'bold', 'dim', 'group'
 ];
 
 export const DEFAULT_INSTALL_PATH = 'C:/Users/marku/.claude/statusline.js';
+export const MAX_LINES = 3;
 
 export function normaliseConfig(config) {
   const c = config || {};
+  const separator = c.separator === undefined ? DEFAULT_SEPARATOR : c.separator;
+  const given = Array.isArray(c.separators) ? c.separators : [];
+  const separators = [];
+  for (let i = 0; i < MAX_LINES; i++) {
+    separators.push(typeof given[i] === 'string' ? given[i] : separator);
+  }
+
   return {
-    version: 1,
-    separator: c.separator === undefined ? ' | ' : c.separator,
+    version: 2,
+    separator,
+    separators,
     dimSeparator: c.dimSeparator !== false,
-    lineCount: Math.max(1, Math.min(3, Number(c.lineCount) || 1)),
+    lineCount: Math.max(1, Math.min(MAX_LINES, Number(c.lineCount) || 1)),
     segments: (c.segments || []).map(segment => {
       const out = {};
       for (const key of SEGMENT_KEYS) {
@@ -38,6 +48,8 @@ export function generateScript(config) {
     '//   "statusLine": { "type": "command", "command": "node <path to this file>" }',
     '//',
     '// Everything configurable lives in CFG below; the engine underneath is generic.',
+    '// The builder can read this file back in, so keep the CFG block intact if you',
+    '// want to keep editing it there.',
     '',
     'const CFG = ' + JSON.stringify(cfg, null, 2) + ';',
     RUNTIME_SOURCE.trim(),
@@ -50,7 +62,7 @@ export function generateConfigJson(config) {
 }
 
 export function parseConfigJson(text) {
-  const parsed = JSON.parse(text);
+  const parsed = typeof text === 'string' ? JSON.parse(text) : text;
   if (!parsed || typeof parsed !== 'object') throw new Error('Config muss ein Objekt sein.');
   if (!Array.isArray(parsed.segments)) throw new Error('Config braucht ein segments-Array.');
 
@@ -59,14 +71,65 @@ export function parseConfigJson(text) {
       throw new Error('Segment ' + index + ' ist kein Objekt.');
     }
     // Fall back to the catalogue entry so an abbreviated config still works.
-    const base = CATALOG_BY_ID[segment.id] || {};
+    // Blocks are user-made and have no catalogue entry, so they carry themselves.
+    const base = isBlock(segment) ? {} : (CATALOG_BY_ID[segment.id] || {});
     if (!segment.source && !base.source) {
-      throw new Error('Segment ' + (segment.id || index) + ' hat keine Quelle.');
+      throw new Error('Segment ' + (segment.id || index) + ' hat keine bekannte Quelle.');
     }
     return { ...base, ...segment };
   });
 
   return { ...normaliseConfig({ ...parsed, segments }), segments };
+}
+
+// Pulls the CFG object literal back out of a generated statusline.js. The
+// literal is written with JSON.stringify, so brace matching plus JSON.parse is
+// enough — no evaluation of untrusted code.
+export function extractCfgLiteral(text) {
+  const marker = /const\s+CFG\s*=\s*\{/.exec(String(text));
+  if (!marker) return null;
+
+  const source = String(text);
+  const start = marker.index + marker[0].length - 1;
+  let depth = 0;
+  let quote = '';
+  let escaped = false;
+
+  for (let i = start; i < source.length; i++) {
+    const ch = source[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (ch === '{') depth += 1;
+    else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+// Accepts a config JSON or a generated statusline.js and returns a config.
+export function parseAnyConfig(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) throw new Error('Nichts zum Einlesen — bitte Datei wählen oder Text einfügen.');
+
+  if (trimmed.startsWith('{')) return parseConfigJson(trimmed);
+
+  const literal = extractCfgLiteral(trimmed);
+  if (literal) return parseConfigJson(literal);
+
+  if (/\bjq\b/.test(trimmed) || /^#!.*\b(bash|sh)\b/m.test(trimmed)) {
+    throw new Error(
+      'Das sieht nach einer Bash-Statusline aus. Die lässt sich nicht automatisch übernehmen — ' +
+      'bau die Segmente einmal links zusammen, danach kannst du das erzeugte statusline.js immer wieder laden.'
+    );
+  }
+  throw new Error('Weder eine Config noch ein erzeugtes statusline.js — kein CFG-Block gefunden.');
 }
 
 function describeColor(color) {
@@ -90,6 +153,12 @@ function describeFormat(format) {
   return bits.join(' ');
 }
 
+function describeSource(segment) {
+  if (isBlock(segment)) return 'fester Text `' + segment.source.value + '`';
+  if (segment.source && segment.source.kind === 'derived') return 'abgeleitet über `' + segment.source.fn + '`';
+  return 'Feld `' + (segment.source ? segment.source.path : '?') + '`';
+}
+
 export function generatePrompt(config, opts = {}) {
   const cfg = normaliseConfig(config);
   const installPath = opts.installPath || DEFAULT_INSTALL_PATH;
@@ -99,13 +168,12 @@ export function generatePrompt(config, opts = {}) {
     const onThisLine = cfg.segments.filter(s => (Number(s.line) || 0) === line);
     if (!onThisLine.length) continue;
     lines.push('');
-    lines.push('**Zeile ' + (line + 1) + '**');
+    lines.push('**Zeile ' + (line + 1) + '** — Trenner `' + cfg.separators[line] + '`' +
+      (cfg.dimSeparator ? ' (gedimmt)' : ''));
     onThisLine.forEach((s, i) => {
       const parts = [
         (i + 1) + '. `' + s.id + '`',
-        s.source && s.source.kind === 'derived'
-          ? 'abgeleitet über `' + s.source.fn + '`'
-          : 'Feld `' + (s.source ? s.source.path : '?') + '`',
+        describeSource(s),
         'Format: ' + describeFormat(s.format),
         'Farbe: ' + describeColor(s.color)
       ];
@@ -130,14 +198,14 @@ export function generatePrompt(config, opts = {}) {
     '',
     '## Aufbau',
     '',
-    '- Trennzeichen: `' + cfg.separator + '`' + (cfg.dimSeparator ? ' (gedimmt)' : ''),
-    '- Zeilen: ' + cfg.lineCount,
+    '- Zeilen: ' + cfg.lineCount + ', jede mit eigenem Trenner (siehe unten)',
     '- Segmente in genau dieser Reihenfolge:',
     ...lines,
     '',
     '## Regeln',
     '',
     '- Fehlt ein Feld im Payload, entfällt das Segment stillschweigend — niemals `null` oder leere Slots drucken.',
+    '- Segmente mit fester Quelle (`fester Text`) werden immer gedruckt, sie dienen als Blocktrenner.',
     '- `resets_at` kann Epoch-Sekunden, Millisekunden oder ISO-String sein; alle drei abfangen.',
     '- Es gibt nur die Buckets `rate_limits.five_hour` und `rate_limits.seven_day`.',
     '- Farben als Truecolor (`ESC[38;2;r;g;bm`), am Ende jedes Segments zurücksetzen.',

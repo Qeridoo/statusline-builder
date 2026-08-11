@@ -282,7 +282,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 
 .row {
   display: grid;
-  grid-template-columns: auto minmax(104px, 1.1fr) auto repeat(3, minmax(80px, 1fr)) auto auto auto;
+  grid-template-columns: auto minmax(96px, 1fr) auto minmax(88px, 1fr) minmax(88px, 1fr) minmax(72px, .7fr) auto minmax(84px, .9fr) auto;
   align-items: center;
   gap: 8px;
   padding: 7px 9px;
@@ -473,6 +473,77 @@ button, select, input, textarea { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---------- per-line separators ---------- */
+
+.seps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+
+.sep-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sep-field input {
+  width: 76px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+
+/* ---------- load panel ---------- */
+
+.btn--small { padding: 3px 9px; font-size: 12px; }
+
+.load-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.load-controls input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.load-controls label.btn { cursor: pointer; }
+
+.install__path { flex-direction: column; align-items: stretch; gap: 5px; }
+
+.code--short { min-height: 88px; }
+
+.row__label {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-2);
+  font-size: 12px;
+  min-width: 0;
+}
+
+.row__label:disabled { opacity: .35; cursor: not-allowed; }
+
+.row__block {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface-2);
+  width: 100%;
+}
 </style>
 
 <header class="proof">
@@ -482,21 +553,6 @@ button, select, input, textarea { font: inherit; color: inherit; }
       <span class="proof__sub">Claude Code &middot; Payload-Schema 2.1.227</span>
       <span class="proof__spacer"></span>
       <label class="field">
-        <span>Trenner</span>
-        <select id="separator">
-          <option value=" | ">Pipe&nbsp;&nbsp;|</option>
-          <option value=" · ">Punkt&nbsp;&nbsp;·</option>
-          <option value=" ▸ ">Pfeil&nbsp;&nbsp;▸</option>
-          <option value="  ">Leerraum</option>
-          <option value=" • ">Bullet&nbsp;&nbsp;•</option>
-          <option value=" ┃ ">Balken&nbsp;&nbsp;┃</option>
-        </select>
-      </label>
-      <label class="field">
-        <input type="checkbox" id="dim-separator" />
-        <span>gedimmt</span>
-      </label>
-      <label class="field">
         <span>Zeilen</span>
         <select id="line-count">
           <option value="1">1</option>
@@ -504,31 +560,45 @@ button, select, input, textarea { font: inherit; color: inherit; }
           <option value="3">3</option>
         </select>
       </label>
+      <label class="field">
+        <input type="checkbox" id="dim-separator" />
+        <span>Trenner gedimmt</span>
+      </label>
     </div>
 
     <div class="terminal" id="preview" aria-live="polite" aria-label="Vorschau der Statusline"></div>
 
     <div class="toolbar">
+      <div class="seps" id="separators"></div>
+      <span class="proof__spacer"></span>
       <label class="slider">
         <span>Kontext</span>
         <input type="range" id="pv-ctx" min="0" max="100" step="1" />
         <output id="pv-ctx-out"></output>
       </label>
       <label class="slider">
-        <span>5h-Limit</span>
+        <span>5h</span>
         <input type="range" id="pv-5h" min="0" max="100" step="1" />
         <output id="pv-5h-out"></output>
       </label>
       <label class="slider">
-        <span>7d-Limit</span>
+        <span>7d</span>
         <input type="range" id="pv-7d" min="0" max="100" step="1" />
         <output id="pv-7d-out"></output>
       </label>
-      <span class="proof__spacer"></span>
       <span class="slider" id="derived-readout"></span>
     </div>
   </div>
 </header>
+
+<datalist id="sep-presets">
+  <option value=" | "></option>
+  <option value=" · "></option>
+  <option value=" ▸ "></option>
+  <option value=" • "></option>
+  <option value=" ┃ "></option>
+  <option value="   "></option>
+</datalist>
 
 <main class="shell">
   <section class="panel panel--catalog">
@@ -544,6 +614,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
     <div class="panel__head">
       <h2 class="panel__title">Reihenfolge &amp; Darstellung</h2>
       <span class="panel__spacer"></span>
+      <button class="btn btn--small" id="add-block" type="button">+ Block</button>
       <label class="field">
         <span>Sortierung</span>
         <select id="sort">
@@ -556,6 +627,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
     </div>
     <div class="panel__body">
       <div class="rows" id="rows"></div>
+      <p class="hint" id="builder-hint">Emoji und Label leer lassen heißt: wird nicht angezeigt. Ein Block ist freier Text, der immer erscheint — praktisch als Gruppentrenner.</p>
     </div>
   </section>
 
@@ -565,24 +637,30 @@ button, select, input, textarea { font: inherit; color: inherit; }
       <span class="panel__spacer"></span>
       <div class="tabs" role="tablist">
         <button class="tab" type="button" role="tab" data-tab="script">statusline.js</button>
-        <button class="tab" type="button" role="tab" data-tab="prompt">Prompt für Claude</button>
+        <button class="tab" type="button" role="tab" data-tab="prompt">Prompt</button>
         <button class="tab" type="button" role="tab" data-tab="config">Config</button>
+        <button class="tab" type="button" role="tab" data-tab="load">Laden</button>
       </div>
     </div>
     <div class="panel__body">
+      <div class="load-controls" id="load-controls" hidden>
+        <label class="btn" for="load-file">Datei wählen …</label>
+        <input type="file" id="load-file" accept=".js,.json,.txt,application/json,text/javascript" />
+        <span id="load-file-name" class="hint"></span>
+      </div>
       <textarea class="code" id="export-out" spellcheck="false" aria-label="Export"></textarea>
       <div class="actions">
         <button class="btn btn--primary" type="button" id="copy">Kopieren</button>
         <button class="btn" type="button" id="download">Herunterladen</button>
-        <button class="btn" type="button" id="import" hidden>Config übernehmen</button>
+        <button class="btn btn--primary" type="button" id="import" hidden>Übernehmen</button>
       </div>
       <p class="hint" id="export-hint"></p>
       <div class="install">
-        <label class="field control" style="flex-direction:column;align-items:stretch;gap:5px">
+        <label class="field control install__path">
           <span>Zielpfad</span>
           <input type="text" id="install-path" spellcheck="false" />
         </label>
-        <textarea class="code" id="settings-snippet" style="min-height:96px" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
+        <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
         <p class="hint">Kommt in <code>~/.claude/settings.json</code>. Kein <code>jq</code> nötig — nur Node.</p>
       </div>
     </div>
@@ -1001,7 +1079,9 @@ function getValue(segment, payload, now) {
   let raw = null;
 
   try {
-    if (segment.source.kind === 'derived') {
+    if (segment.source.kind === 'literal') {
+      raw = segment.source.value;
+    } else if (segment.source.kind === 'derived') {
       const fn = DERIVED[segment.source.fn];
       raw = fn ? fn(payload, at) : null;
     } else {
@@ -1101,6 +1181,38 @@ const CATALOG = [
 
 const CATALOG_BY_ID = CATALOG.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
 
+// Free-text blocks. They are not part of the catalogue — the user creates them —
+// but they behave like any other segment, so they can be dragged between the
+// real ones to act as group dividers.
+const BLOCK_GROUP = 'block';
+
+function isBlock(segment) {
+  return Boolean(segment && segment.source && segment.source.kind === 'literal');
+}
+
+function makeBlock(id, text) {
+  return {
+    id,
+    group: BLOCK_GROUP,
+    label: 'Block',
+    emoji: '',
+    source: { kind: 'literal', value: text === undefined ? '┃' : text },
+    format: { type: 'raw' },
+    color: { mode: 'static', value: '#8a90a0' },
+    showLabel: false,
+    showEmoji: false,
+    line: 0,
+    hideWhen: 'empty'
+  };
+}
+
+function nextBlockId(segments) {
+  let n = 1;
+  const taken = new Set((segments || []).map(s => s.id));
+  while (taken.has('block_' + n)) n += 1;
+  return 'block_' + n;
+}
+
 // The layout from the reference screenshot, used by the "reference" sort option
 // and as the default configuration.
 const REFERENCE_ORDER = [
@@ -1120,6 +1232,17 @@ const escapeHtml = s => String(s).replace(/[&<>"]/g, c => HTML_ESCAPES[c]);
 // interpolated into markup after it has been checked.
 const safeHex = hex => (/^#[0-9a-f]{6}$/i.test(String(hex)) ? String(hex) : null);
 
+const DEFAULT_SEPARATOR = ' | ';
+
+// Each line carries its own separator; config.separator is the fallback for
+// lines that were never given one, and for configs written before per-line
+// separators existed.
+function separatorFor(config, index) {
+  const perLine = config.separators;
+  if (Array.isArray(perLine) && typeof perLine[index] === 'string') return perLine[index];
+  return config.separator === undefined ? DEFAULT_SEPARATOR : config.separator;
+}
+
 function segmentText(segment, value) {
   const pieces = [];
   if (segment.showEmoji !== false && segment.emoji) pieces.push(segment.emoji);
@@ -1128,51 +1251,56 @@ function segmentText(segment, value) {
   return pieces.join(' ');
 }
 
+// Returns one entry per non-empty line, keeping the original line index so the
+// caller can look up that line's separator.
 function buildLines(config, payload, now) {
   const lineCount = Math.max(1, Math.min(3, Number(config.lineCount) || 1));
   const lines = [];
-  for (let i = 0; i < lineCount; i++) lines.push([]);
+  for (let i = 0; i < lineCount; i++) lines.push({ line: i, parts: [] });
 
   for (const segment of config.segments || []) {
     const value = getValue(segment, payload, now);
     if (!value) continue;
     const index = Math.min(lineCount - 1, Math.max(0, Number(segment.line) || 0));
-    lines[index].push({
+    lines[index].parts.push({
       segment,
       value,
       text: segmentText(segment, value),
       hex: safeHex(resolveColor(segment.color, value.colorValue))
     });
   }
-  return lines.filter(parts => parts.length > 0);
+  return lines.filter(entry => entry.parts.length > 0);
 }
 
 function renderAnsi(config, payload, now) {
   const at = now === undefined ? Date.now() : now;
-  const separator = config.separator === undefined ? ' | ' : config.separator;
-  const joiner = ansiWrap(separator, null, { dim: config.dimSeparator !== false });
   return buildLines(config, payload, at)
-    .map(parts => parts
-      .map(p => ansiWrap(p.text, p.hex, { bold: p.segment.bold, dim: p.segment.dim }))
-      .join(joiner))
+    .map(entry => {
+      const joiner = ansiWrap(separatorFor(config, entry.line), null, { dim: config.dimSeparator !== false });
+      return entry.parts
+        .map(p => ansiWrap(p.text, p.hex, { bold: p.segment.bold, dim: p.segment.dim }))
+        .join(joiner);
+    })
     .join('\n');
 }
 
 function renderHtml(config, payload, now) {
   const at = now === undefined ? Date.now() : now;
-  const separator = config.separator === undefined ? ' | ' : config.separator;
-  const joiner = '<span class="sl-sep">' + escapeHtml(separator).replace(/ /g, '&nbsp;') + '</span>';
   return buildLines(config, payload, at)
-    .map(parts => parts
-      .map(p => {
-        const styles = [];
-        if (p.hex) styles.push('color:' + p.hex);
-        if (p.segment.bold) styles.push('font-weight:700');
-        if (p.segment.dim) styles.push('opacity:.6');
-        const attr = styles.length ? ' style="' + styles.join(';') + '"' : '';
-        return '<span class="sl-seg"' + attr + '>' + escapeHtml(p.text) + '</span>';
-      })
-      .join(joiner))
+    .map(entry => {
+      const joiner = '<span class="sl-sep">' +
+        escapeHtml(separatorFor(config, entry.line)).replace(/ /g, '&nbsp;') + '</span>';
+      return entry.parts
+        .map(p => {
+          const styles = [];
+          if (p.hex) styles.push('color:' + p.hex);
+          if (p.segment.bold) styles.push('font-weight:700');
+          if (p.segment.dim) styles.push('opacity:.6');
+          const attr = styles.length ? ' style="' + styles.join(';') + '"' : '';
+          return '<span class="sl-seg"' + attr + '>' + escapeHtml(p.text) + '</span>';
+        })
+        .join(joiner);
+    })
     .join('<br>');
 }
 
@@ -1403,9 +1531,9 @@ function getValue(segment, payload) {
   if (!segment || !segment.source) return null;
   let raw = null;
   try {
-    raw = segment.source.kind === 'derived'
-      ? derivedValue(segment.source.fn, payload)
-      : getPath(payload, segment.source.path);
+    if (segment.source.kind === 'literal') raw = segment.source.value;
+    else if (segment.source.kind === 'derived') raw = derivedValue(segment.source.fn, payload);
+    else raw = getPath(payload, segment.source.path);
   } catch (e) {
     return null;
   }
@@ -1487,10 +1615,16 @@ function segmentText(segment, value) {
   return pieces.join(' ');
 }
 
+function separatorFor(index) {
+  const perLine = CFG.separators;
+  if (Array.isArray(perLine) && typeof perLine[index] === 'string') return perLine[index];
+  return CFG.separator === undefined ? ' | ' : CFG.separator;
+}
+
 function render(payload) {
   const lineCount = Math.max(1, Math.min(3, Number(CFG.lineCount) || 1));
   const lines = [];
-  for (let i = 0; i < lineCount; i++) lines.push([]);
+  for (let i = 0; i < lineCount; i++) lines.push({ line: i, parts: [] });
 
   const segments = CFG.segments || [];
   for (let i = 0; i < segments.length; i++) {
@@ -1498,20 +1632,21 @@ function render(payload) {
     const value = getValue(segment, payload);
     if (!value) continue;
     const index = Math.min(lineCount - 1, Math.max(0, Number(segment.line) || 0));
-    lines[index].push({
+    lines[index].parts.push({
       segment: segment,
       text: segmentText(segment, value),
       hex: safeHex(resolveColor(segment.color, value.colorValue))
     });
   }
 
-  const separator = CFG.separator === undefined ? ' | ' : CFG.separator;
-  const joiner = ansiWrap(separator, null, { dim: CFG.dimSeparator !== false });
   return lines
-    .filter(parts => parts.length > 0)
-    .map(parts => parts
-      .map(p => ansiWrap(p.text, p.hex, { bold: p.segment.bold, dim: p.segment.dim }))
-      .join(joiner))
+    .filter(entry => entry.parts.length > 0)
+    .map(entry => {
+      const joiner = ansiWrap(separatorFor(entry.line), null, { dim: CFG.dimSeparator !== false });
+      return entry.parts
+        .map(p => ansiWrap(p.text, p.hex, { bold: p.segment.bold, dim: p.segment.dim }))
+        .join(joiner);
+    })
     .join('\n');
 }
 
@@ -1542,24 +1677,33 @@ process.stdin.on('end', () => {
 `;
 
 // ---------- src/generate.js ----------
-// The three export formats: a runnable script, a handover prompt, and a config
-// file that can be read back in.
+// The export formats: a runnable script, a handover prompt, and a config file —
+// plus the readers that turn any of those back into a config.
 
 
 const SEGMENT_KEYS = [
   'id', 'label', 'emoji', 'source', 'format', 'showLabel', 'showEmoji',
-  'line', 'color', 'hideValues', 'scaleMap', 'bold', 'dim'
+  'line', 'color', 'hideValues', 'scaleMap', 'bold', 'dim', 'group'
 ];
 
 const DEFAULT_INSTALL_PATH = 'C:/Users/marku/.claude/statusline.js';
+const MAX_LINES = 3;
 
 function normaliseConfig(config) {
   const c = config || {};
+  const separator = c.separator === undefined ? DEFAULT_SEPARATOR : c.separator;
+  const given = Array.isArray(c.separators) ? c.separators : [];
+  const separators = [];
+  for (let i = 0; i < MAX_LINES; i++) {
+    separators.push(typeof given[i] === 'string' ? given[i] : separator);
+  }
+
   return {
-    version: 1,
-    separator: c.separator === undefined ? ' | ' : c.separator,
+    version: 2,
+    separator,
+    separators,
     dimSeparator: c.dimSeparator !== false,
-    lineCount: Math.max(1, Math.min(3, Number(c.lineCount) || 1)),
+    lineCount: Math.max(1, Math.min(MAX_LINES, Number(c.lineCount) || 1)),
     segments: (c.segments || []).map(segment => {
       const out = {};
       for (const key of SEGMENT_KEYS) {
@@ -1580,6 +1724,8 @@ function generateScript(config) {
     '//   "statusLine": { "type": "command", "command": "node <path to this file>" }',
     '//',
     '// Everything configurable lives in CFG below; the engine underneath is generic.',
+    '// The builder can read this file back in, so keep the CFG block intact if you',
+    '// want to keep editing it there.',
     '',
     'const CFG = ' + JSON.stringify(cfg, null, 2) + ';',
     RUNTIME_SOURCE.trim(),
@@ -1592,7 +1738,7 @@ function generateConfigJson(config) {
 }
 
 function parseConfigJson(text) {
-  const parsed = JSON.parse(text);
+  const parsed = typeof text === 'string' ? JSON.parse(text) : text;
   if (!parsed || typeof parsed !== 'object') throw new Error('Config muss ein Objekt sein.');
   if (!Array.isArray(parsed.segments)) throw new Error('Config braucht ein segments-Array.');
 
@@ -1601,14 +1747,65 @@ function parseConfigJson(text) {
       throw new Error('Segment ' + index + ' ist kein Objekt.');
     }
     // Fall back to the catalogue entry so an abbreviated config still works.
-    const base = CATALOG_BY_ID[segment.id] || {};
+    // Blocks are user-made and have no catalogue entry, so they carry themselves.
+    const base = isBlock(segment) ? {} : (CATALOG_BY_ID[segment.id] || {});
     if (!segment.source && !base.source) {
-      throw new Error('Segment ' + (segment.id || index) + ' hat keine Quelle.');
+      throw new Error('Segment ' + (segment.id || index) + ' hat keine bekannte Quelle.');
     }
     return { ...base, ...segment };
   });
 
   return { ...normaliseConfig({ ...parsed, segments }), segments };
+}
+
+// Pulls the CFG object literal back out of a generated statusline.js. The
+// literal is written with JSON.stringify, so brace matching plus JSON.parse is
+// enough — no evaluation of untrusted code.
+function extractCfgLiteral(text) {
+  const marker = /const\s+CFG\s*=\s*\{/.exec(String(text));
+  if (!marker) return null;
+
+  const source = String(text);
+  const start = marker.index + marker[0].length - 1;
+  let depth = 0;
+  let quote = '';
+  let escaped = false;
+
+  for (let i = start; i < source.length; i++) {
+    const ch = source[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (ch === '{') depth += 1;
+    else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+// Accepts a config JSON or a generated statusline.js and returns a config.
+function parseAnyConfig(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) throw new Error('Nichts zum Einlesen — bitte Datei wählen oder Text einfügen.');
+
+  if (trimmed.startsWith('{')) return parseConfigJson(trimmed);
+
+  const literal = extractCfgLiteral(trimmed);
+  if (literal) return parseConfigJson(literal);
+
+  if (/\bjq\b/.test(trimmed) || /^#!.*\b(bash|sh)\b/m.test(trimmed)) {
+    throw new Error(
+      'Das sieht nach einer Bash-Statusline aus. Die lässt sich nicht automatisch übernehmen — ' +
+      'bau die Segmente einmal links zusammen, danach kannst du das erzeugte statusline.js immer wieder laden.'
+    );
+  }
+  throw new Error('Weder eine Config noch ein erzeugtes statusline.js — kein CFG-Block gefunden.');
 }
 
 function describeColor(color) {
@@ -1632,6 +1829,12 @@ function describeFormat(format) {
   return bits.join(' ');
 }
 
+function describeSource(segment) {
+  if (isBlock(segment)) return 'fester Text `' + segment.source.value + '`';
+  if (segment.source && segment.source.kind === 'derived') return 'abgeleitet über `' + segment.source.fn + '`';
+  return 'Feld `' + (segment.source ? segment.source.path : '?') + '`';
+}
+
 function generatePrompt(config, opts = {}) {
   const cfg = normaliseConfig(config);
   const installPath = opts.installPath || DEFAULT_INSTALL_PATH;
@@ -1641,13 +1844,12 @@ function generatePrompt(config, opts = {}) {
     const onThisLine = cfg.segments.filter(s => (Number(s.line) || 0) === line);
     if (!onThisLine.length) continue;
     lines.push('');
-    lines.push('**Zeile ' + (line + 1) + '**');
+    lines.push('**Zeile ' + (line + 1) + '** — Trenner `' + cfg.separators[line] + '`' +
+      (cfg.dimSeparator ? ' (gedimmt)' : ''));
     onThisLine.forEach((s, i) => {
       const parts = [
         (i + 1) + '. `' + s.id + '`',
-        s.source && s.source.kind === 'derived'
-          ? 'abgeleitet über `' + s.source.fn + '`'
-          : 'Feld `' + (s.source ? s.source.path : '?') + '`',
+        describeSource(s),
         'Format: ' + describeFormat(s.format),
         'Farbe: ' + describeColor(s.color)
       ];
@@ -1672,14 +1874,14 @@ function generatePrompt(config, opts = {}) {
     '',
     '## Aufbau',
     '',
-    '- Trennzeichen: `' + cfg.separator + '`' + (cfg.dimSeparator ? ' (gedimmt)' : ''),
-    '- Zeilen: ' + cfg.lineCount,
+    '- Zeilen: ' + cfg.lineCount + ', jede mit eigenem Trenner (siehe unten)',
     '- Segmente in genau dieser Reihenfolge:',
     ...lines,
     '',
     '## Regeln',
     '',
     '- Fehlt ein Feld im Payload, entfällt das Segment stillschweigend — niemals `null` oder leere Slots drucken.',
+    '- Segmente mit fester Quelle (`fester Text`) werden immer gedruckt, sie dienen als Blocktrenner.',
     '- `resets_at` kann Epoch-Sekunden, Millisekunden oder ISO-String sein; alle drei abfangen.',
     '- Es gibt nur die Buckets `rate_limits.five_hour` und `rate_limits.seven_day`.',
     '- Farben als Truecolor (`ESC[38;2;r;g;bm`), am Ende jedes Segments zurücksetzen.',
@@ -1712,23 +1914,32 @@ const KEY = 'statusline-builder:v1';
 function defaultState() {
   return {
     segments: REFERENCE_ORDER.map(id => ({ ...CATALOG_BY_ID[id] })),
-    separator: ' | ',
+    separator: DEFAULT_SEPARATOR,
+    separators: Array.from({ length: MAX_LINES }, () => DEFAULT_SEPARATOR),
     dimSeparator: true,
     lineCount: 1,
     sort: 'manual',
     preview: { ctx: 10, fiveHour: 1, sevenDay: 32 },
     installPath: DEFAULT_INSTALL_PATH,
-    tab: 'script'
+    tab: 'script',
+    loadDraft: ''
   };
 }
 
-// Segments are stored with their full definition so an old saved state still
-// works, but catalogue fields win for anything the user never touched.
+// Catalogue fields win for anything the user never touched, so an old saved
+// state still picks up catalogue fixes. Blocks are user-made and carry
+// themselves — they have no catalogue entry to merge with.
 function rehydrate(segments) {
   if (!Array.isArray(segments)) return defaultState().segments;
   return segments
-    .filter(s => s && CATALOG_BY_ID[s.id])
-    .map(s => ({ ...CATALOG_BY_ID[s.id], ...s }));
+    .filter(s => s && (isBlock(s) || CATALOG_BY_ID[s.id]))
+    .map(s => (isBlock(s) ? { ...s } : { ...CATALOG_BY_ID[s.id], ...s }));
+}
+
+function normaliseSeparators(stored, fallback) {
+  const given = Array.isArray(stored) ? stored : [];
+  return Array.from({ length: MAX_LINES }, (_, i) =>
+    (typeof given[i] === 'string' ? given[i] : fallback));
 }
 
 function load() {
@@ -1736,9 +1947,12 @@ function load() {
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (!stored) return base;
+    const separator = typeof stored.separator === 'string' ? stored.separator : base.separator;
     return {
       ...base,
       ...stored,
+      separator,
+      separators: normaliseSeparators(stored.separators, separator),
       segments: rehydrate(stored.segments),
       preview: { ...base.preview, ...(stored.preview || {}) }
     };
@@ -1785,13 +1999,14 @@ function toConfig() {
   return {
     segments: s.segments,
     separator: s.separator,
+    separators: s.separators,
     dimSeparator: s.dimSeparator,
     lineCount: s.lineCount
   };
 }
 
 // ---------- src/ui-export.js ----------
-// Preview rendering and the export panel.
+// Preview rendering, the export panel, and reading an existing status line back in.
 
 
 const HOUR = 3600 * 1000;
@@ -1832,8 +2047,13 @@ function renderPreview(el, readoutEl) {
 const HINTS = {
   script: 'Datei speichern und in settings.json darauf zeigen. Läuft mit purem Node, ohne jq.',
   prompt: 'An Claude geben — enthält Segmentliste, Regeln und die fertige Config.',
-  config: 'Sichern oder in einer anderen Session wieder einlesen: einfügen und übernehmen.'
+  config: 'Kompakte Sicherung der Einstellungen. Zum Zurückladen den Tab „Laden" nehmen.',
+  load: 'Bestehendes statusline.js oder eine Config einfügen bzw. Datei wählen, dann Übernehmen.'
 };
+
+const LOAD_PLACEHOLDER =
+  'Hier ein erzeugtes statusline.js einfügen (der CFG-Block wird ausgelesen) oder eine Config-JSON.\n' +
+  'Alternativ oben eine Datei wählen — z. B. C:/Users/<du>/.claude/statusline.js';
 
 function exportText(tab) {
   const config = toConfig();
@@ -1842,7 +2062,19 @@ function exportText(tab) {
   return generateScript(config);
 }
 
-const FILENAMES = { script: 'statusline.js', prompt: 'statusline-prompt.md', config: 'statusline-config.json' };
+const FILENAMES = {
+  script: 'statusline.js',
+  prompt: 'statusline-prompt.md',
+  config: 'statusline-config.json'
+};
+
+function inIframe() {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
 
 function download(tab, text) {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -1850,14 +2082,18 @@ function download(tab, text) {
   const a = document.createElement('a');
   a.href = url;
   a.download = FILENAMES[tab] || 'statusline.txt';
+  a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  // Revoking straight away can cancel the download before it starts.
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-async function copyText(text, button) {
-  const original = button.textContent;
+async function copyText(text, button, node) {
+  if (!button.dataset.label) button.dataset.label = button.textContent;
+  const original = button.dataset.label;
+
   let ok = false;
   try {
     await navigator.clipboard.writeText(text);
@@ -1865,57 +2101,114 @@ async function copyText(text, button) {
   } catch {
     ok = false;
   }
-  button.textContent = ok ? 'Kopiert' : 'Bitte manuell markieren';
-  setTimeout(() => { button.textContent = original; }, 1600);
+  if (!ok && node) {
+    // Clipboard API needs a permission the artifact sandbox may withhold.
+    try {
+      node.focus();
+      node.select();
+      ok = document.execCommand('copy');
+    } catch {
+      ok = false;
+    }
+  }
+
+  button.textContent = ok ? 'Kopiert' : 'Bitte manuell kopieren';
+  setTimeout(() => { button.textContent = original; }, 1800);
 }
 
 function importConfig(text) {
-  const config = parseConfigJson(text);
+  const config = parseAnyConfig(text);
   patch({
     segments: config.segments,
     separator: config.separator,
+    separators: config.separators,
     dimSeparator: config.dimSeparator,
     lineCount: config.lineCount,
     sort: 'manual'
   });
+  return config;
 }
 
-function mountExport(dom) {
-  const setTab = tab => {
-    patch({ tab });
-  };
+let lastTab = null;
 
+function mountExport(dom, rebuild) {
   dom.tabs.forEach(button => {
-    button.addEventListener('click', () => setTab(button.dataset.tab));
+    button.addEventListener('click', () => patch({ tab: button.dataset.tab }));
   });
 
-  dom.copy.addEventListener('click', () => copyText(dom.out.value, dom.copy));
-  dom.download.addEventListener('click', () => download(getState().tab, dom.out.value));
+  dom.copy.addEventListener('click', () => copyText(dom.out.value, dom.copy, dom.out));
 
-  dom.import.addEventListener('click', () => {
-    try {
-      importConfig(dom.out.value);
-      dom.hint.textContent = 'Config übernommen.';
-    } catch (error) {
-      dom.hint.textContent = 'Config nicht lesbar: ' + error.message;
+  dom.download.addEventListener('click', () => {
+    download(getState().tab, dom.out.value);
+    if (inIframe()) {
+      dom.hint.textContent =
+        'Download angestoßen. Falls nichts passiert, blockiert die Sandbox ihn — dann „Kopieren" nutzen ' +
+        'oder die Seite lokal öffnen.';
     }
   });
+
+  dom.import.addEventListener('click', () => {
+    let config;
+    try {
+      config = importConfig(dom.out.value);
+    } catch (error) {
+      dom.hint.textContent = error.message;
+      return;
+    }
+    patch({ tab: 'script' });
+    rebuild();
+    dom.hint.textContent = 'Übernommen — ' + config.segments.length +
+      ' Segmente, ' + config.lineCount + (config.lineCount === 1 ? ' Zeile.' : ' Zeilen.');
+  });
+
+  if (dom.loadFile) {
+    dom.loadFile.addEventListener('change', () => {
+      const file = dom.loadFile.files && dom.loadFile.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        dom.out.value = String(reader.result || '');
+        if (dom.loadFileName) dom.loadFileName.textContent = file.name;
+        dom.hint.textContent = 'Datei gelesen. Jetzt „Übernehmen" drücken.';
+      };
+      reader.onerror = () => { dom.hint.textContent = 'Datei konnte nicht gelesen werden.'; };
+      reader.readAsText(file);
+    });
+  }
 
   dom.installPath.addEventListener('input', () => patch({ installPath: dom.installPath.value }));
 }
 
 function renderExport(dom) {
   const { tab, installPath } = getState();
+  const tabChanged = tab !== lastTab;
+  lastTab = tab;
 
   dom.tabs.forEach(button => {
     button.setAttribute('aria-selected', String(button.dataset.tab === tab));
   });
 
-  // Leave the box alone while the user is pasting into it on the config tab.
-  if (document.activeElement !== dom.out) dom.out.value = exportText(tab);
-  dom.out.readOnly = tab !== 'config';
-  dom.import.hidden = tab !== 'config';
-  dom.hint.textContent = HINTS[tab];
+  if (tab === 'load') {
+    // Only clear on arrival, so a paste survives the re-render that follows it.
+    if (tabChanged) {
+      dom.out.value = '';
+      if (dom.loadFileName) dom.loadFileName.textContent = '';
+    }
+    dom.out.readOnly = false;
+    dom.out.placeholder = LOAD_PLACEHOLDER;
+  } else {
+    // Export views are read-only, so there is never a user edit to protect —
+    // always rewrite them, otherwise they go stale after an import.
+    dom.out.value = exportText(tab);
+    dom.out.readOnly = true;
+    dom.out.placeholder = '';
+  }
+
+  dom.import.hidden = tab !== 'load';
+  dom.download.hidden = tab === 'load';
+  dom.copy.hidden = tab === 'load';
+  if (dom.loadControls) dom.loadControls.hidden = tab !== 'load';
+  if (tabChanged) dom.hint.textContent = HINTS[tab];
 
   if (document.activeElement !== dom.installPath) dom.installPath.value = installPath;
   dom.snippet.value = generateSettingsSnippet(installPath);
@@ -2045,17 +2338,21 @@ function mount() {
     readout: document.getElementById('derived-readout'),
     catalog: document.getElementById('catalog'),
     rows: document.getElementById('rows'),
-    separator: document.getElementById('separator'),
+    separators: document.getElementById('separators'),
     dimSeparator: document.getElementById('dim-separator'),
     lineCount: document.getElementById('line-count'),
     sort: document.getElementById('sort'),
     clearAll: document.getElementById('clear-all'),
+    addBlock: document.getElementById('add-block'),
     tabs: Array.from(document.querySelectorAll('.tab')),
     out: document.getElementById('export-out'),
     copy: document.getElementById('copy'),
     download: document.getElementById('download'),
     import: document.getElementById('import'),
     hint: document.getElementById('export-hint'),
+    loadControls: document.getElementById('load-controls'),
+    loadFile: document.getElementById('load-file'),
+    loadFileName: document.getElementById('load-file-name'),
     installPath: document.getElementById('install-path'),
     snippet: document.getElementById('settings-snippet'),
     sliders: [
@@ -2071,13 +2368,14 @@ function mount() {
   };
 
   const rebuild = () => {
-    renderCatalog(dom, rebuild, refresh);
-    renderRows(dom, rebuild, refresh);
+    renderSeparators(dom);
+    renderCatalog(dom, rebuild);
+    renderRows(dom, rebuild);
     refresh();
   };
 
-  dom.separator.addEventListener('change', () => patch({ separator: dom.separator.value }));
   dom.dimSeparator.addEventListener('change', () => patch({ dimSeparator: dom.dimSeparator.checked }));
+
   dom.lineCount.addEventListener('change', () => {
     patch({ lineCount: Number(dom.lineCount.value) });
     rebuild();
@@ -2093,6 +2391,13 @@ function mount() {
     rebuild();
   });
 
+  dom.addBlock.addEventListener('click', () => {
+    const segments = getState().segments.slice();
+    segments.push(makeBlock(nextBlockId(segments)));
+    patch({ segments, sort: 'manual' });
+    rebuild();
+  });
+
   for (const [key, input, output] of dom.sliders) {
     input.addEventListener('input', () => {
       getState().preview[key] = Number(input.value);
@@ -2101,11 +2406,10 @@ function mount() {
     });
   }
 
-  mountExport(dom);
+  mountExport(dom, rebuild);
   subscribe(() => refresh());
 
   const state = getState();
-  dom.separator.value = state.separator;
   dom.dimSeparator.checked = state.dimSeparator;
   dom.lineCount.value = String(state.lineCount);
   dom.sort.value = state.sort;
@@ -2120,12 +2424,17 @@ function mount() {
 function applySort(mode) {
   const state = getState();
   const segments = state.segments.slice();
+  // Blocks are placed by hand, so they sort to the end rather than jumping to
+  // the front on an unknown group.
+  const groupRank = segment => {
+    const index = GROUPS.map(g => g.id).indexOf(segment.group);
+    return index === -1 ? GROUPS.length : index;
+  };
 
   if (mode === 'alpha') {
     segments.sort((a, b) => a.id.localeCompare(b.id));
   } else if (mode === 'group') {
-    const order = GROUPS.map(g => g.id);
-    segments.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || a.id.localeCompare(b.id));
+    segments.sort((a, b) => groupRank(a) - groupRank(b) || a.id.localeCompare(b.id));
   } else if (mode === 'reference') {
     const rank = id => {
       const index = REFERENCE_ORDER.indexOf(id);
@@ -2135,6 +2444,29 @@ function applySort(mode) {
   }
 
   patch({ segments, sort: mode });
+}
+
+function renderSeparators(dom) {
+  const state = getState();
+  dom.separators.replaceChildren();
+
+  for (let i = 0; i < state.lineCount; i++) {
+    const index = i;
+    dom.separators.appendChild(el('label', { class: 'sep-field' }, [
+      el('span', { text: state.lineCount > 1 ? 'Trenner Zeile ' + (index + 1) : 'Trenner' }),
+      el('input', {
+        type: 'text',
+        list: 'sep-presets',
+        value: state.separators[index],
+        'aria-label': 'Trenner für Zeile ' + (index + 1),
+        oninput: event => {
+          getState().separators[index] = event.target.value;
+          if (index === 0) getState().separator = event.target.value;
+          commit();
+        }
+      })
+    ]));
+  }
 }
 
 function renderCatalog(dom, rebuild) {
@@ -2198,8 +2530,10 @@ function renderRows(dom, rebuild) {
   };
 
   state.segments.forEach((segment, index) => {
+    const block = isBlock(segment);
     const choices = formatChoices(segment);
     const colorId = activeColorChoice(segment);
+    const catalogueLabel = (CATALOG_BY_ID[segment.id] || {}).label || '';
 
     const swatch = el('input', {
       class: 'row__swatch',
@@ -2213,12 +2547,52 @@ function renderRows(dom, rebuild) {
     });
     swatch.hidden = colorId !== 'static';
 
+    // Blocks carry their own text; catalogue segments get a format dropdown.
+    const contentCell = block
+      ? el('input', {
+          class: 'row__block',
+          type: 'text',
+          value: segment.source.value,
+          placeholder: 'Blocktext',
+          'aria-label': 'Text des Blocks',
+          oninput: event => {
+            segment.source = { kind: 'literal', value: event.target.value };
+            commit();
+          }
+        })
+      : (choices.length > 1
+          ? select(
+              choices.map((choice, i) => ({ value: String(i), label: choice.label })),
+              String(activeFormatChoice(segment)),
+              value => {
+                segment.format = { ...segment.format, ...choices[Number(value)].patch };
+                commit();
+              }
+            )
+          : el('span', { class: 'row__group', text: (segment.format || {}).type || 'text' }));
+
+    const labelInput = el('input', {
+      class: 'row__label',
+      type: 'text',
+      maxlength: '18',
+      value: segment.showLabel ? (segment.label || '') : '',
+      placeholder: block ? '—' : (catalogueLabel || 'Label'),
+      'aria-label': 'Label für ' + segment.id,
+      oninput: event => {
+        const text = event.target.value;
+        segment.showLabel = text.length > 0;
+        segment.label = text || catalogueLabel;
+        commit();
+      }
+    });
+    if (block) labelInput.disabled = true;
+
     const row = el('div', { class: 'row', draggable: 'true' }, [
       el('span', { class: 'row__grip', text: '⠿', 'aria-hidden': 'true' }),
 
       el('div', { class: 'row__name' }, [
         el('span', { class: 'row__id', text: segment.id, title: segment.id }),
-        el('span', { class: 'row__group', text: segment.group })
+        el('span', { class: 'row__group', text: block ? 'Block' : segment.group })
       ]),
 
       el('input', {
@@ -2226,6 +2600,7 @@ function renderRows(dom, rebuild) {
         type: 'text',
         maxlength: '4',
         value: segment.emoji || '',
+        placeholder: '–',
         'aria-label': 'Emoji für ' + segment.id,
         oninput: event => {
           segment.emoji = event.target.value;
@@ -2234,16 +2609,7 @@ function renderRows(dom, rebuild) {
         }
       }),
 
-      choices.length > 1
-        ? select(
-            choices.map((choice, i) => ({ value: String(i), label: choice.label })),
-            String(activeFormatChoice(segment)),
-            value => {
-              segment.format = { ...segment.format, ...choices[Number(value)].patch };
-              commit();
-            }
-          )
-        : el('span', { class: 'row__group', text: (segment.format || {}).type || 'text' }),
+      contentCell,
 
       select(
         COLOR_CHOICES.map(choice => ({ value: choice.id, label: choice.label })),
@@ -2266,18 +2632,7 @@ function renderRows(dom, rebuild) {
       ),
 
       swatch,
-
-      el('label', { class: 'row__toggle' }, [
-        el('input', {
-          type: 'checkbox',
-          checked: segment.showLabel === true,
-          onchange: event => {
-            segment.showLabel = event.target.checked;
-            commit();
-          }
-        }),
-        el('span', { text: 'Label' })
-      ]),
+      labelInput,
 
       el('div', { class: 'row__toggle' }, [
         el('button', {

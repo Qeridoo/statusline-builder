@@ -145,7 +145,9 @@ export function getValue(segment, payload, now) {
   let raw = null;
 
   try {
-    if (segment.source.kind === 'derived') {
+    if (segment.source.kind === 'literal') {
+      raw = segment.source.value;
+    } else if (segment.source.kind === 'derived') {
       const fn = DERIVED[segment.source.fn];
       raw = fn ? fn(payload, at) : null;
     } else {
@@ -244,6 +246,38 @@ export const CATALOG = [
 ];
 
 export const CATALOG_BY_ID = CATALOG.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
+
+// Free-text blocks. They are not part of the catalogue — the user creates them —
+// but they behave like any other segment, so they can be dragged between the
+// real ones to act as group dividers.
+export const BLOCK_GROUP = 'block';
+
+export function isBlock(segment) {
+  return Boolean(segment && segment.source && segment.source.kind === 'literal');
+}
+
+export function makeBlock(id, text) {
+  return {
+    id,
+    group: BLOCK_GROUP,
+    label: 'Block',
+    emoji: '',
+    source: { kind: 'literal', value: text === undefined ? '┃' : text },
+    format: { type: 'raw' },
+    color: { mode: 'static', value: '#8a90a0' },
+    showLabel: false,
+    showEmoji: false,
+    line: 0,
+    hideWhen: 'empty'
+  };
+}
+
+export function nextBlockId(segments) {
+  let n = 1;
+  const taken = new Set((segments || []).map(s => s.id));
+  while (taken.has('block_' + n)) n += 1;
+  return 'block_' + n;
+}
 
 // The layout from the reference screenshot, used by the "reference" sort option
 // and as the default configuration.

@@ -7,6 +7,29 @@ config file you can read back in later.
 Open `index.html` by double-clicking it. There is no build step, no server, and no
 network access: everything is inlined into that one file.
 
+## Composing a line
+
+- **Labels** — every row has a label field. Leave it empty and nothing is printed;
+  type into it and that exact text is used, so `ctx` can become `kontext` or `k`.
+  The emoji field behaves the same way: empty means no emoji.
+- **Blocks** — `+ Block` adds a segment that is just free text. Unlike a real
+  segment it always prints, so it works as a fixed divider between groups. Drag it
+  wherever you want the break.
+- **Separators per line** — each line has its own separator field, with the common
+  ones offered as suggestions and anything else accepted as free text.
+- **Loading an existing line** — the **Laden** tab reads a `statusline.js` this tool
+  generated (it pulls the `CFG` block back out) or a saved config JSON, from a paste
+  or a file. A hand-written bash status line cannot be imported; the app says so
+  rather than failing quietly.
+
+Everything is kept in `localStorage`, so the page reopens where you left it.
+
+### If Herunterladen does nothing
+
+The published artifact runs inside a sandboxed iframe, and some browsers block
+downloads there. Use **Kopieren** instead, or open `index.html` locally where the
+download works normally.
+
 ## Why Node and not jq
 
 Most status line scripts shell out to `jq` for every field. That is slow — twenty
@@ -96,7 +119,7 @@ number to trust for the week as a whole.
 ## Development
 
 ```bash
-npm test        # node --test — 75 tests
+npm test        # node --test — 99 tests
 node build.js   # regenerates index.html from src/
 ./test.sh path/to/statusline.js   # pipes sample-payload.json through a generated script
 ```

@@ -1,6 +1,9 @@
 // Catalogue, builder rows, and the wiring that ties everything to state.
 
-import { CATALOG, CATALOG_BY_ID, GROUPS, REFERENCE_ORDER, USAGE, INVERSE, MOOD_STOPS } from './catalog.js';
+import {
+  CATALOG, CATALOG_BY_ID, GROUPS, REFERENCE_ORDER,
+  USAGE, INVERSE, MOOD_STOPS, isBlock, makeBlock, nextBlockId
+} from './catalog.js';
 import { getState, patch, commit, subscribe } from './state.js';
 import { renderPreview, renderExport, mountExport } from './ui-export.js';
 
@@ -124,17 +127,21 @@ export function mount() {
     readout: document.getElementById('derived-readout'),
     catalog: document.getElementById('catalog'),
     rows: document.getElementById('rows'),
-    separator: document.getElementById('separator'),
+    separators: document.getElementById('separators'),
     dimSeparator: document.getElementById('dim-separator'),
     lineCount: document.getElementById('line-count'),
     sort: document.getElementById('sort'),
     clearAll: document.getElementById('clear-all'),
+    addBlock: document.getElementById('add-block'),
     tabs: Array.from(document.querySelectorAll('.tab')),
     out: document.getElementById('export-out'),
     copy: document.getElementById('copy'),
     download: document.getElementById('download'),
     import: document.getElementById('import'),
     hint: document.getElementById('export-hint'),
+    loadControls: document.getElementById('load-controls'),
+    loadFile: document.getElementById('load-file'),
+    loadFileName: document.getElementById('load-file-name'),
     installPath: document.getElementById('install-path'),
     snippet: document.getElementById('settings-snippet'),
     sliders: [
@@ -150,13 +157,14 @@ export function mount() {
   };
 
   const rebuild = () => {
-    renderCatalog(dom, rebuild, refresh);
-    renderRows(dom, rebuild, refresh);
+    renderSeparators(dom);
+    renderCatalog(dom, rebuild);
+    renderRows(dom, rebuild);
     refresh();
   };
 
-  dom.separator.addEventListener('change', () => patch({ separator: dom.separator.value }));
   dom.dimSeparator.addEventListener('change', () => patch({ dimSeparator: dom.dimSeparator.checked }));
+
   dom.lineCount.addEventListener('change', () => {
     patch({ lineCount: Number(dom.lineCount.value) });
     rebuild();
@@ -172,6 +180,13 @@ export function mount() {
     rebuild();
   });
 
+  dom.addBlock.addEventListener('click', () => {
+    const segments = getState().segments.slice();
+    segments.push(makeBlock(nextBlockId(segments)));
+    patch({ segments, sort: 'manual' });
+    rebuild();
+  });
+
   for (const [key, input, output] of dom.sliders) {
     input.addEventListener('input', () => {
       getState().preview[key] = Number(input.value);
@@ -180,11 +195,10 @@ export function mount() {
     });
   }
 
-  mountExport(dom);
+  mountExport(dom, rebuild);
   subscribe(() => refresh());
 
   const state = getState();
-  dom.separator.value = state.separator;
   dom.dimSeparator.checked = state.dimSeparator;
   dom.lineCount.value = String(state.lineCount);
   dom.sort.value = state.sort;
@@ -199,12 +213,17 @@ export function mount() {
 function applySort(mode) {
   const state = getState();
   const segments = state.segments.slice();
+  // Blocks are placed by hand, so they sort to the end rather than jumping to
+  // the front on an unknown group.
+  const groupRank = segment => {
+    const index = GROUPS.map(g => g.id).indexOf(segment.group);
+    return index === -1 ? GROUPS.length : index;
+  };
 
   if (mode === 'alpha') {
     segments.sort((a, b) => a.id.localeCompare(b.id));
   } else if (mode === 'group') {
-    const order = GROUPS.map(g => g.id);
-    segments.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || a.id.localeCompare(b.id));
+    segments.sort((a, b) => groupRank(a) - groupRank(b) || a.id.localeCompare(b.id));
   } else if (mode === 'reference') {
     const rank = id => {
       const index = REFERENCE_ORDER.indexOf(id);
@@ -214,6 +233,29 @@ function applySort(mode) {
   }
 
   patch({ segments, sort: mode });
+}
+
+function renderSeparators(dom) {
+  const state = getState();
+  dom.separators.replaceChildren();
+
+  for (let i = 0; i < state.lineCount; i++) {
+    const index = i;
+    dom.separators.appendChild(el('label', { class: 'sep-field' }, [
+      el('span', { text: state.lineCount > 1 ? 'Trenner Zeile ' + (index + 1) : 'Trenner' }),
+      el('input', {
+        type: 'text',
+        list: 'sep-presets',
+        value: state.separators[index],
+        'aria-label': 'Trenner für Zeile ' + (index + 1),
+        oninput: event => {
+          getState().separators[index] = event.target.value;
+          if (index === 0) getState().separator = event.target.value;
+          commit();
+        }
+      })
+    ]));
+  }
 }
 
 function renderCatalog(dom, rebuild) {
@@ -277,8 +319,10 @@ function renderRows(dom, rebuild) {
   };
 
   state.segments.forEach((segment, index) => {
+    const block = isBlock(segment);
     const choices = formatChoices(segment);
     const colorId = activeColorChoice(segment);
+    const catalogueLabel = (CATALOG_BY_ID[segment.id] || {}).label || '';
 
     const swatch = el('input', {
       class: 'row__swatch',
@@ -292,12 +336,52 @@ function renderRows(dom, rebuild) {
     });
     swatch.hidden = colorId !== 'static';
 
+    // Blocks carry their own text; catalogue segments get a format dropdown.
+    const contentCell = block
+      ? el('input', {
+          class: 'row__block',
+          type: 'text',
+          value: segment.source.value,
+          placeholder: 'Blocktext',
+          'aria-label': 'Text des Blocks',
+          oninput: event => {
+            segment.source = { kind: 'literal', value: event.target.value };
+            commit();
+          }
+        })
+      : (choices.length > 1
+          ? select(
+              choices.map((choice, i) => ({ value: String(i), label: choice.label })),
+              String(activeFormatChoice(segment)),
+              value => {
+                segment.format = { ...segment.format, ...choices[Number(value)].patch };
+                commit();
+              }
+            )
+          : el('span', { class: 'row__group', text: (segment.format || {}).type || 'text' }));
+
+    const labelInput = el('input', {
+      class: 'row__label',
+      type: 'text',
+      maxlength: '18',
+      value: segment.showLabel ? (segment.label || '') : '',
+      placeholder: block ? '—' : (catalogueLabel || 'Label'),
+      'aria-label': 'Label für ' + segment.id,
+      oninput: event => {
+        const text = event.target.value;
+        segment.showLabel = text.length > 0;
+        segment.label = text || catalogueLabel;
+        commit();
+      }
+    });
+    if (block) labelInput.disabled = true;
+
     const row = el('div', { class: 'row', draggable: 'true' }, [
       el('span', { class: 'row__grip', text: '⠿', 'aria-hidden': 'true' }),
 
       el('div', { class: 'row__name' }, [
         el('span', { class: 'row__id', text: segment.id, title: segment.id }),
-        el('span', { class: 'row__group', text: segment.group })
+        el('span', { class: 'row__group', text: block ? 'Block' : segment.group })
       ]),
 
       el('input', {
@@ -305,6 +389,7 @@ function renderRows(dom, rebuild) {
         type: 'text',
         maxlength: '4',
         value: segment.emoji || '',
+        placeholder: '–',
         'aria-label': 'Emoji für ' + segment.id,
         oninput: event => {
           segment.emoji = event.target.value;
@@ -313,16 +398,7 @@ function renderRows(dom, rebuild) {
         }
       }),
 
-      choices.length > 1
-        ? select(
-            choices.map((choice, i) => ({ value: String(i), label: choice.label })),
-            String(activeFormatChoice(segment)),
-            value => {
-              segment.format = { ...segment.format, ...choices[Number(value)].patch };
-              commit();
-            }
-          )
-        : el('span', { class: 'row__group', text: (segment.format || {}).type || 'text' }),
+      contentCell,
 
       select(
         COLOR_CHOICES.map(choice => ({ value: choice.id, label: choice.label })),
@@ -345,18 +421,7 @@ function renderRows(dom, rebuild) {
       ),
 
       swatch,
-
-      el('label', { class: 'row__toggle' }, [
-        el('input', {
-          type: 'checkbox',
-          checked: segment.showLabel === true,
-          onchange: event => {
-            segment.showLabel = event.target.checked;
-            commit();
-          }
-        }),
-        el('span', { text: 'Label' })
-      ]),
+      labelInput,
 
       el('div', { class: 'row__toggle' }, [
         el('button', {

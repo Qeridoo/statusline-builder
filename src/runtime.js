@@ -224,9 +224,9 @@ function getValue(segment, payload) {
   if (!segment || !segment.source) return null;
   let raw = null;
   try {
-    raw = segment.source.kind === 'derived'
-      ? derivedValue(segment.source.fn, payload)
-      : getPath(payload, segment.source.path);
+    if (segment.source.kind === 'literal') raw = segment.source.value;
+    else if (segment.source.kind === 'derived') raw = derivedValue(segment.source.fn, payload);
+    else raw = getPath(payload, segment.source.path);
   } catch (e) {
     return null;
   }
@@ -308,10 +308,16 @@ function segmentText(segment, value) {
   return pieces.join(' ');
 }
 
+function separatorFor(index) {
+  const perLine = CFG.separators;
+  if (Array.isArray(perLine) && typeof perLine[index] === 'string') return perLine[index];
+  return CFG.separator === undefined ? ' | ' : CFG.separator;
+}
+
 function render(payload) {
   const lineCount = Math.max(1, Math.min(3, Number(CFG.lineCount) || 1));
   const lines = [];
-  for (let i = 0; i < lineCount; i++) lines.push([]);
+  for (let i = 0; i < lineCount; i++) lines.push({ line: i, parts: [] });
 
   const segments = CFG.segments || [];
   for (let i = 0; i < segments.length; i++) {
@@ -319,20 +325,21 @@ function render(payload) {
     const value = getValue(segment, payload);
     if (!value) continue;
     const index = Math.min(lineCount - 1, Math.max(0, Number(segment.line) || 0));
-    lines[index].push({
+    lines[index].parts.push({
       segment: segment,
       text: segmentText(segment, value),
       hex: safeHex(resolveColor(segment.color, value.colorValue))
     });
   }
 
-  const separator = CFG.separator === undefined ? ' | ' : CFG.separator;
-  const joiner = ansiWrap(separator, null, { dim: CFG.dimSeparator !== false });
   return lines
-    .filter(parts => parts.length > 0)
-    .map(parts => parts
-      .map(p => ansiWrap(p.text, p.hex, { bold: p.segment.bold, dim: p.segment.dim }))
-      .join(joiner))
+    .filter(entry => entry.parts.length > 0)
+    .map(entry => {
+      const joiner = ansiWrap(separatorFor(entry.line), null, { dim: CFG.dimSeparator !== false });
+      return entry.parts
+        .map(p => ansiWrap(p.text, p.hex, { bold: p.segment.bold, dim: p.segment.dim }))
+        .join(joiner);
+    })
     .join('\n');
 }
 

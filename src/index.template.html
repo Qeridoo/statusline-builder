@@ -8,21 +8,6 @@
       <span class="proof__sub">Claude Code &middot; Payload-Schema 2.1.227</span>
       <span class="proof__spacer"></span>
       <label class="field">
-        <span>Trenner</span>
-        <select id="separator">
-          <option value=" | ">Pipe&nbsp;&nbsp;|</option>
-          <option value=" · ">Punkt&nbsp;&nbsp;·</option>
-          <option value=" ▸ ">Pfeil&nbsp;&nbsp;▸</option>
-          <option value="  ">Leerraum</option>
-          <option value=" • ">Bullet&nbsp;&nbsp;•</option>
-          <option value=" ┃ ">Balken&nbsp;&nbsp;┃</option>
-        </select>
-      </label>
-      <label class="field">
-        <input type="checkbox" id="dim-separator" />
-        <span>gedimmt</span>
-      </label>
-      <label class="field">
         <span>Zeilen</span>
         <select id="line-count">
           <option value="1">1</option>
@@ -30,31 +15,45 @@
           <option value="3">3</option>
         </select>
       </label>
+      <label class="field">
+        <input type="checkbox" id="dim-separator" />
+        <span>Trenner gedimmt</span>
+      </label>
     </div>
 
     <div class="terminal" id="preview" aria-live="polite" aria-label="Vorschau der Statusline"></div>
 
     <div class="toolbar">
+      <div class="seps" id="separators"></div>
+      <span class="proof__spacer"></span>
       <label class="slider">
         <span>Kontext</span>
         <input type="range" id="pv-ctx" min="0" max="100" step="1" />
         <output id="pv-ctx-out"></output>
       </label>
       <label class="slider">
-        <span>5h-Limit</span>
+        <span>5h</span>
         <input type="range" id="pv-5h" min="0" max="100" step="1" />
         <output id="pv-5h-out"></output>
       </label>
       <label class="slider">
-        <span>7d-Limit</span>
+        <span>7d</span>
         <input type="range" id="pv-7d" min="0" max="100" step="1" />
         <output id="pv-7d-out"></output>
       </label>
-      <span class="proof__spacer"></span>
       <span class="slider" id="derived-readout"></span>
     </div>
   </div>
 </header>
+
+<datalist id="sep-presets">
+  <option value=" | "></option>
+  <option value=" · "></option>
+  <option value=" ▸ "></option>
+  <option value=" • "></option>
+  <option value=" ┃ "></option>
+  <option value="   "></option>
+</datalist>
 
 <main class="shell">
   <section class="panel panel--catalog">
@@ -70,6 +69,7 @@
     <div class="panel__head">
       <h2 class="panel__title">Reihenfolge &amp; Darstellung</h2>
       <span class="panel__spacer"></span>
+      <button class="btn btn--small" id="add-block" type="button">+ Block</button>
       <label class="field">
         <span>Sortierung</span>
         <select id="sort">
@@ -82,6 +82,7 @@
     </div>
     <div class="panel__body">
       <div class="rows" id="rows"></div>
+      <p class="hint" id="builder-hint">Emoji und Label leer lassen heißt: wird nicht angezeigt. Ein Block ist freier Text, der immer erscheint — praktisch als Gruppentrenner.</p>
     </div>
   </section>
 
@@ -91,24 +92,30 @@
       <span class="panel__spacer"></span>
       <div class="tabs" role="tablist">
         <button class="tab" type="button" role="tab" data-tab="script">statusline.js</button>
-        <button class="tab" type="button" role="tab" data-tab="prompt">Prompt für Claude</button>
+        <button class="tab" type="button" role="tab" data-tab="prompt">Prompt</button>
         <button class="tab" type="button" role="tab" data-tab="config">Config</button>
+        <button class="tab" type="button" role="tab" data-tab="load">Laden</button>
       </div>
     </div>
     <div class="panel__body">
+      <div class="load-controls" id="load-controls" hidden>
+        <label class="btn" for="load-file">Datei wählen …</label>
+        <input type="file" id="load-file" accept=".js,.json,.txt,application/json,text/javascript" />
+        <span id="load-file-name" class="hint"></span>
+      </div>
       <textarea class="code" id="export-out" spellcheck="false" aria-label="Export"></textarea>
       <div class="actions">
         <button class="btn btn--primary" type="button" id="copy">Kopieren</button>
         <button class="btn" type="button" id="download">Herunterladen</button>
-        <button class="btn" type="button" id="import" hidden>Config übernehmen</button>
+        <button class="btn btn--primary" type="button" id="import" hidden>Übernehmen</button>
       </div>
       <p class="hint" id="export-hint"></p>
       <div class="install">
-        <label class="field control" style="flex-direction:column;align-items:stretch;gap:5px">
+        <label class="field control install__path">
           <span>Zielpfad</span>
           <input type="text" id="install-path" spellcheck="false" />
         </label>
-        <textarea class="code" id="settings-snippet" style="min-height:96px" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
+        <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
         <p class="hint">Kommt in <code>~/.claude/settings.json</code>. Kein <code>jq</code> nötig — nur Node.</p>
       </div>
     </div>

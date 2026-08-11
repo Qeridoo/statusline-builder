@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { buildBundle } from '../build.js';
+import { generateScript } from '../src/generate.js';
+import { CATALOG_BY_ID } from '../src/catalog.js';
 
 const template = readFileSync(new URL('../src/index.template.html', import.meta.url), 'utf8');
 
@@ -33,19 +35,25 @@ function makeElement(tag = 'div') {
     textContent: '',
     innerHTML: '',
     value: '',
+    placeholder: '',
     checked: false,
     hidden: false,
     readOnly: false,
     disabled: false,
+    clicks: 0,
     appendChild(child) { node.children.push(child); return child; },
     replaceChildren(...next) { node.children = next; },
     remove() {},
+    click() { node.clicks += 1; },
+    focus() {},
+    select() {},
     addEventListener(type, fn) {
       if (!listeners.has(type)) listeners.set(type, []);
       listeners.get(type).push(fn);
     },
     setAttribute(key, value) {
       node.attributes[key] = String(value);
+      if (key === 'value') node.value = String(value);
       if (key.startsWith('data-')) {
         node.dataset[key.slice(5).replace(/-(\w)/g, (_, c) => c.toUpperCase())] = String(value);
       }
@@ -56,8 +64,7 @@ function makeElement(tag = 'div') {
       const handlers = listeners.get(type) || [];
       for (const fn of handlers) fn({ target: node, preventDefault() {}, ...event });
       return handlers.length;
-    },
-    hasListener(type) { return (listeners.get(type) || []).length > 0; }
+    }
   };
   return node;
 }
@@ -78,14 +85,20 @@ function makeSandbox() {
     return tab;
   });
 
+  const anchors = [];
   const store = new Map();
   const document = {
     readyState: 'complete',
     activeElement: makeElement('body'),
     getElementById: id => (byId.has(id) ? byId.get(id) : null),
     querySelectorAll: selector => (selector === '.tab' ? tabs : []),
-    createElement: makeElement,
+    createElement: tag => {
+      const node = makeElement(tag);
+      if (String(tag).toLowerCase() === 'a') anchors.push(node);
+      return node;
+    },
     addEventListener() {},
+    execCommand: () => true,
     body: makeElement('body')
   };
 
@@ -101,11 +114,19 @@ function makeSandbox() {
       setItem: (key, value) => store.set(key, value),
       removeItem: key => store.delete(key)
     },
-    JSON, Math, Date, Number, String, Boolean, Array, Object, Error, Set, Map, RegExp, Intl,
-    URL, Blob: class {}
+    // Node has no FileReader; the file picker only needs it to hand back text.
+    FileReader: class {
+      readAsText(file) {
+        this.result = file && file.text !== undefined ? file.text : '';
+        if (this.onload) this.onload();
+      }
+    },
+    Blob,
+    URL,
+    JSON, Math, Date, Number, String, Boolean, Array, Object, Error, Set, Map, RegExp, Intl
   };
   sandbox.globalThis = sandbox;
-  return { sandbox, byId, tabs, store };
+  return { sandbox, byId, tabs, store, anchors };
 }
 
 const boot = () => {
@@ -113,6 +134,10 @@ const boot = () => {
   runInNewContext(buildBundle(), ctx.sandbox);
   return ctx;
 };
+
+const nodesOfClass = (byId, id, className) =>
+  walk(byId.get(id)).filter(n => n.className === className);
+const rowCount = byId => nodesOfClass(byId, 'rows', 'row').length;
 
 test('the app mounts without throwing', () => {
   assert.doesNotThrow(boot);
@@ -134,33 +159,29 @@ test('the export box and settings snippet are filled on mount', () => {
 
 test('the catalogue renders a chip per segment and the builder a row per active one', () => {
   const { byId } = boot();
-  const chips = walk(byId.get('catalog')).filter(n => n.className === 'chip');
-  const rows = walk(byId.get('rows')).filter(n => n.className === 'row');
+  const chips = nodesOfClass(byId, 'catalog', 'chip');
   assert.equal(chips.length, 44);
-  assert.equal(rows.length, 11);
+  assert.equal(rowCount(byId), 11);
   assert.equal(chips.filter(c => c.getAttribute('aria-pressed') === 'true').length, 11);
 });
 
 test('clicking an inactive chip adds a row', () => {
   const { byId } = boot();
-  const before = walk(byId.get('rows')).filter(n => n.className === 'row').length;
-  const off = walk(byId.get('catalog')).find(n => n.className === 'chip' && n.getAttribute('aria-pressed') === 'false');
+  const before = rowCount(byId);
+  const off = nodesOfClass(byId, 'catalog', 'chip').find(n => n.getAttribute('aria-pressed') === 'false');
   assert.ok(off, 'no inactive chip found');
   off.fire('click');
-  const after = walk(byId.get('rows')).filter(n => n.className === 'row').length;
-  assert.equal(after, before + 1);
+  assert.equal(rowCount(byId), before + 1);
 });
 
 test('the sort dropdown reorders the rows', () => {
   const { byId } = boot();
-  const idsNow = () => walk(byId.get('rows')).filter(n => n.className === 'row__id').map(n => n.textContent);
+  const idsNow = () => nodesOfClass(byId, 'rows', 'row__id').map(n => n.textContent);
   const before = idsNow();
   const sort = byId.get('sort');
   sort.value = 'alpha';
   sort.fire('change');
-  const after = idsNow();
-  assert.notDeepEqual(after, before);
-  assert.deepEqual(after, before.slice().sort((a, b) => a.localeCompare(b)));
+  assert.deepEqual(idsNow(), before.slice().sort((a, b) => a.localeCompare(b)));
 });
 
 test('the line-count dropdown changes how many lines a segment can go to', () => {
@@ -173,18 +194,6 @@ test('the line-count dropdown changes how many lines a segment can go to', () =>
   lineCount.value = '3';
   lineCount.fire('change');
   assert.equal(lineSelects()[0].children.length, 3);
-});
-
-test('switching the export tab swaps the output', () => {
-  const { byId, tabs } = boot();
-  const out = byId.get('export-out');
-  const script = out.value;
-  tabs.find(t => t.dataset.tab === 'prompt').fire('click');
-  assert.notEqual(out.value, script);
-  assert.match(out.value, /Statusline/);
-  tabs.find(t => t.dataset.tab === 'config').fire('click');
-  assert.match(out.value, /"segments"/);
-  assert.equal(byId.get('import').hidden, false);
 });
 
 test('the preview sliders drive the rendered percentages', () => {
@@ -200,17 +209,180 @@ test('clearing everything empties the preview and shows a hint', () => {
   const { byId } = boot();
   byId.get('clear-all').fire('click');
   assert.equal(byId.get('preview').innerHTML, '');
-  const empty = walk(byId.get('rows')).filter(n => n.className === 'empty');
-  assert.equal(empty.length, 1);
+  assert.equal(nodesOfClass(byId, 'rows', 'empty').length, 1);
 });
 
 test('state survives a reload through localStorage', () => {
-  const ctx = makeSandbox();
-  runInNewContext(buildBundle(), ctx.sandbox);
+  const ctx = boot();
   ctx.byId.get('clear-all').fire('click');
 
   const second = makeSandbox();
   second.store.set('statusline-builder:v1', ctx.store.get('statusline-builder:v1'));
   runInNewContext(buildBundle(), second.sandbox);
-  assert.equal(walk(second.byId.get('rows')).filter(n => n.className === 'row').length, 0);
+  assert.equal(rowCount(second.byId), 0);
+});
+
+// ---- separators per line ----
+
+test('each line gets its own separator input', () => {
+  const { byId } = boot();
+  const inputs = () => walk(byId.get('separators')).filter(n => n.tagName === 'INPUT');
+  assert.equal(inputs().length, 1);
+
+  const lineCount = byId.get('line-count');
+  lineCount.value = '3';
+  lineCount.fire('change');
+  assert.equal(inputs().length, 3);
+});
+
+test('editing a separator changes the preview', () => {
+  const { byId } = boot();
+  const separator = walk(byId.get('separators')).find(n => n.tagName === 'INPUT');
+  separator.value = ' ~~ ';
+  separator.fire('input');
+  assert.ok(byId.get('preview').innerHTML.includes('~~'));
+});
+
+// ---- custom labels ----
+
+test('typing a label shows it in the preview, clearing it hides it again', () => {
+  const { byId } = boot();
+  const label = nodesOfClass(byId, 'rows', 'row__label')[0];
+  label.value = 'mdl';
+  label.fire('input');
+  assert.match(byId.get('preview').innerHTML, /mdl:/);
+
+  label.value = '';
+  label.fire('input');
+  assert.equal(/mdl:/.test(byId.get('preview').innerHTML), false);
+});
+
+// ---- literal blocks ----
+
+test('adding a block inserts a row whose text lands in the preview', () => {
+  const { byId } = boot();
+  const before = rowCount(byId);
+  byId.get('add-block').fire('click');
+  assert.equal(rowCount(byId), before + 1);
+
+  const blockInput = nodesOfClass(byId, 'rows', 'row__block')[0];
+  assert.ok(blockInput, 'block row has no text input');
+  blockInput.value = '<<>>';
+  blockInput.fire('input');
+  assert.ok(byId.get('preview').innerHTML.includes('&lt;&lt;&gt;&gt;'));
+});
+
+test('blocks get unique ids', () => {
+  const { byId } = boot();
+  byId.get('add-block').fire('click');
+  byId.get('add-block').fire('click');
+  const ids = nodesOfClass(byId, 'rows', 'row__id').map(n => n.textContent).filter(t => t.startsWith('block_'));
+  assert.deepEqual(ids, ['block_1', 'block_2']);
+});
+
+// ---- export panel ----
+
+test('switching the export tab swaps the output', () => {
+  const { byId, tabs } = boot();
+  const out = byId.get('export-out');
+  const script = out.value;
+
+  tabs.find(t => t.dataset.tab === 'prompt').fire('click');
+  assert.notEqual(out.value, script);
+  assert.match(out.value, /Statusline/);
+
+  tabs.find(t => t.dataset.tab === 'config').fire('click');
+  assert.match(out.value, /"segments"/);
+  assert.equal(byId.get('import').hidden, true);
+
+  tabs.find(t => t.dataset.tab === 'load').fire('click');
+  assert.equal(out.value, '');
+  assert.equal(byId.get('import').hidden, false);
+  assert.equal(byId.get('load-controls').hidden, false);
+});
+
+test('download builds a named anchor and clicks it', () => {
+  const { byId, anchors } = boot();
+  byId.get('download').fire('click');
+  assert.equal(anchors.length, 1);
+  assert.equal(anchors[0].download, 'statusline.js');
+  assert.equal(anchors[0].clicks, 1);
+  assert.ok(String(anchors[0].href).length > 0);
+});
+
+test('download names the file after the active tab', () => {
+  const { byId, tabs, anchors } = boot();
+  tabs.find(t => t.dataset.tab === 'config').fire('click');
+  byId.get('download').fire('click');
+  assert.equal(anchors[0].download, 'statusline-config.json');
+});
+
+// ---- loading an existing status line ----
+
+const twoSegmentScript = generateScript({
+  segments: [{ ...CATALOG_BY_ID.model }, { ...CATALOG_BY_ID.session_name }],
+  separator: ' :: ',
+  lineCount: 1
+});
+
+test('loading a generated script rebuilds rows, chips and the export view', () => {
+  const { byId, tabs } = boot();
+  assert.equal(rowCount(byId), 11);
+
+  tabs.find(t => t.dataset.tab === 'load').fire('click');
+  byId.get('export-out').value = twoSegmentScript;
+  byId.get('import').fire('click');
+
+  // The builder must follow the import, not just the preview — this was the bug.
+  assert.equal(rowCount(byId), 2);
+  assert.deepEqual(nodesOfClass(byId, 'rows', 'row__id').map(n => n.textContent), ['model', 'session_name']);
+  assert.equal(
+    nodesOfClass(byId, 'catalog', 'chip').filter(c => c.getAttribute('aria-pressed') === 'true').length,
+    2
+  );
+
+  // …and it lands back on the script tab showing the imported config.
+  assert.match(byId.get('export-out').value, /^#!\/usr\/bin\/env node/);
+  assert.match(byId.get('export-out').value, /"separator": " :: "/);
+  assert.match(byId.get('export-hint').textContent, /Übernommen — 2 Segmente/);
+});
+
+test('a bad paste reports why and leaves the config alone', () => {
+  const { byId, tabs } = boot();
+  const before = rowCount(byId);
+  tabs.find(t => t.dataset.tab === 'load').fire('click');
+  byId.get('export-out').value = '#!/usr/bin/env bash\njq -r .model';
+  byId.get('import').fire('click');
+  assert.match(byId.get('export-hint').textContent, /Bash-Statusline/);
+  tabs.find(t => t.dataset.tab === 'script').fire('click');
+  assert.equal(rowCount(byId), before);
+});
+
+test('an imported layout survives a reload', () => {
+  const ctx = boot();
+  ctx.tabs.find(t => t.dataset.tab === 'load').fire('click');
+  ctx.byId.get('export-out').value = twoSegmentScript;
+  ctx.byId.get('import').fire('click');
+
+  const second = makeSandbox();
+  second.store.set('statusline-builder:v1', ctx.store.get('statusline-builder:v1'));
+  runInNewContext(buildBundle(), second.sandbox);
+  assert.deepEqual(
+    nodesOfClass(second.byId, 'rows', 'row__id').map(n => n.textContent),
+    ['model', 'session_name']
+  );
+});
+
+test('blocks survive a reload', () => {
+  const ctx = boot();
+  ctx.byId.get('add-block').fire('click');
+  const blockInput = nodesOfClass(ctx.byId, 'rows', 'row__block')[0];
+  blockInput.value = '§§';
+  blockInput.fire('input');
+
+  const second = makeSandbox();
+  second.store.set('statusline-builder:v1', ctx.store.get('statusline-builder:v1'));
+  runInNewContext(buildBundle(), second.sandbox);
+  assert.ok(nodesOfClass(second.byId, 'rows', 'row__block').some(n => n.value === '§§'));
+  assert.ok(second.byId.get('preview').innerHTML.includes('§§'));
 });
