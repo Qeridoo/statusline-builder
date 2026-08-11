@@ -544,6 +544,12 @@ button, select, input, textarea { font: inherit; color: inherit; }
   background: var(--surface-2);
   width: 100%;
 }
+
+.code--line { min-height: 54px; }
+
+.install__btn { align-self: flex-start; }
+
+.install .hint b { color: var(--ink-2); font-weight: 700; }
 </style>
 
 <header class="proof">
@@ -660,8 +666,14 @@ button, select, input, textarea { font: inherit; color: inherit; }
           <span>Zielpfad</span>
           <input type="text" id="install-path" spellcheck="false" />
         </label>
+
+        <p class="hint"><b>1.</b> Oben <b>Kopieren</b> drücken. <b>2.</b> Diese Zeile in PowerShell ausführen — sie schreibt die Zwischenablage direkt in die Datei, ganz ohne Download:</p>
+        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="PowerShell-Befehl zum Speichern"></textarea>
+        <button class="btn btn--small install__btn" type="button" id="copy-command">Befehl kopieren</button>
+
+        <p class="hint"><b>3.</b> Das hier in <code>~/.claude/settings.json</code> eintragen:</p>
         <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
-        <p class="hint">Kommt in <code>~/.claude/settings.json</code>. Kein <code>jq</code> nötig — nur Node.</p>
+        <p class="hint">Eine vorhandene <code>statusline.sh</code> muss nicht angefasst werden — sobald <code>settings.json</code> auf das Node-Skript zeigt, wird sie nicht mehr aufgerufen. Kein <code>jq</code> nötig.</p>
       </div>
     </div>
   </section>
@@ -2076,8 +2088,17 @@ function inIframe() {
   }
 }
 
+// A PowerShell one-liner that writes the clipboard straight to the target file.
+// The artifact sandbox can block downloads outright, and this needs none.
+function installCommand(installPath) {
+  const windowsPath = String(installPath || DEFAULT_INSTALL_PATH).replace(/\//g, '\\');
+  return 'Get-Clipboard -Raw | Set-Content -Encoding utf8 "' + windowsPath + '"';
+}
+
 function download(tab, text) {
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  // text/plain makes browsers append .txt to a .js filename; octet-stream keeps
+  // the name from the download attribute intact.
+  const blob = new Blob([text], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -2141,11 +2162,24 @@ function mountExport(dom, rebuild) {
   dom.download.addEventListener('click', () => {
     download(getState().tab, dom.out.value);
     if (inIframe()) {
+      // Nothing in the page can lift a sandbox download block, so fall straight
+      // through to the path that always works: select the text for copying.
+      try {
+        dom.out.focus();
+        dom.out.select();
+      } catch {
+        // Selecting is a convenience; ignore browsers that refuse it.
+      }
       dom.hint.textContent =
-        'Download angestoßen. Falls nichts passiert, blockiert die Sandbox ihn — dann „Kopieren" nutzen ' +
-        'oder die Seite lokal öffnen.';
+        'Kommt kein Download an, blockiert ihn die Sandbox. Der Text ist jetzt markiert — ' +
+        'Strg+C, dann den PowerShell-Befehl unten ausführen.';
     }
   });
+
+  if (dom.copyCommand) {
+    dom.copyCommand.addEventListener('click', () =>
+      copyText(installCommand(getState().installPath), dom.copyCommand, dom.installCommand));
+  }
 
   dom.import.addEventListener('click', () => {
     let config;
@@ -2212,6 +2246,7 @@ function renderExport(dom) {
 
   if (document.activeElement !== dom.installPath) dom.installPath.value = installPath;
   dom.snippet.value = generateSettingsSnippet(installPath);
+  if (dom.installCommand) dom.installCommand.value = installCommand(installPath);
 }
 
 // ---------- src/ui.js ----------
@@ -2354,6 +2389,8 @@ function mount() {
     loadFile: document.getElementById('load-file'),
     loadFileName: document.getElementById('load-file-name'),
     installPath: document.getElementById('install-path'),
+    installCommand: document.getElementById('install-command'),
+    copyCommand: document.getElementById('copy-command'),
     snippet: document.getElementById('settings-snippet'),
     sliders: [
       ['ctx', document.getElementById('pv-ctx'), document.getElementById('pv-ctx-out')],

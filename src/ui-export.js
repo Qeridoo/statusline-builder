@@ -5,7 +5,7 @@ import { getState, patch, toConfig } from './state.js';
 import { todayLeft, pace, evenBurn } from './derive.js';
 import {
   generateScript, generatePrompt, generateConfigJson,
-  parseAnyConfig, generateSettingsSnippet
+  parseAnyConfig, generateSettingsSnippet, DEFAULT_INSTALL_PATH
 } from './generate.js';
 
 const HOUR = 3600 * 1000;
@@ -75,8 +75,17 @@ export function inIframe() {
   }
 }
 
+// A PowerShell one-liner that writes the clipboard straight to the target file.
+// The artifact sandbox can block downloads outright, and this needs none.
+export function installCommand(installPath) {
+  const windowsPath = String(installPath || DEFAULT_INSTALL_PATH).replace(/\//g, '\\');
+  return 'Get-Clipboard -Raw | Set-Content -Encoding utf8 "' + windowsPath + '"';
+}
+
 export function download(tab, text) {
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  // text/plain makes browsers append .txt to a .js filename; octet-stream keeps
+  // the name from the download attribute intact.
+  const blob = new Blob([text], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -140,11 +149,24 @@ export function mountExport(dom, rebuild) {
   dom.download.addEventListener('click', () => {
     download(getState().tab, dom.out.value);
     if (inIframe()) {
+      // Nothing in the page can lift a sandbox download block, so fall straight
+      // through to the path that always works: select the text for copying.
+      try {
+        dom.out.focus();
+        dom.out.select();
+      } catch {
+        // Selecting is a convenience; ignore browsers that refuse it.
+      }
       dom.hint.textContent =
-        'Download angestoßen. Falls nichts passiert, blockiert die Sandbox ihn — dann „Kopieren" nutzen ' +
-        'oder die Seite lokal öffnen.';
+        'Kommt kein Download an, blockiert ihn die Sandbox. Der Text ist jetzt markiert — ' +
+        'Strg+C, dann den PowerShell-Befehl unten ausführen.';
     }
   });
+
+  if (dom.copyCommand) {
+    dom.copyCommand.addEventListener('click', () =>
+      copyText(installCommand(getState().installPath), dom.copyCommand, dom.installCommand));
+  }
 
   dom.import.addEventListener('click', () => {
     let config;
@@ -211,4 +233,5 @@ export function renderExport(dom) {
 
   if (document.activeElement !== dom.installPath) dom.installPath.value = installPath;
   dom.snippet.value = generateSettingsSnippet(installPath);
+  if (dom.installCommand) dom.installCommand.value = installCommand(installPath);
 }

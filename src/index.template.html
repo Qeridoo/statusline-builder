@@ -115,8 +115,14 @@
           <span>Zielpfad</span>
           <input type="text" id="install-path" spellcheck="false" />
         </label>
+
+        <p class="hint"><b>1.</b> Oben <b>Kopieren</b> drücken. <b>2.</b> Diese Zeile in PowerShell ausführen — sie schreibt die Zwischenablage direkt in die Datei, ganz ohne Download:</p>
+        <textarea class="code code--line" id="install-command" spellcheck="false" readonly aria-label="PowerShell-Befehl zum Speichern"></textarea>
+        <button class="btn btn--small install__btn" type="button" id="copy-command">Befehl kopieren</button>
+
+        <p class="hint"><b>3.</b> Das hier in <code>~/.claude/settings.json</code> eintragen:</p>
         <textarea class="code code--short" id="settings-snippet" spellcheck="false" readonly aria-label="settings.json Ausschnitt"></textarea>
-        <p class="hint">Kommt in <code>~/.claude/settings.json</code>. Kein <code>jq</code> nötig — nur Node.</p>
+        <p class="hint">Eine vorhandene <code>statusline.sh</code> muss nicht angefasst werden — sobald <code>settings.json</code> auf das Node-Skript zeigt, wird sie nicht mehr aufgerufen. Kein <code>jq</code> nötig.</p>
       </div>
     </div>
   </section>

@@ -542,3 +542,9 @@ button, select, input, textarea { font: inherit; color: inherit; }
   background: var(--surface-2);
   width: 100%;
 }
+
+.code--line { min-height: 54px; }
+
+.install__btn { align-self: flex-start; }
+
+.install .hint b { color: var(--ink-2); font-weight: 700; }

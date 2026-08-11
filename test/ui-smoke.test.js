@@ -386,3 +386,31 @@ test('blocks survive a reload', () => {
   assert.ok(nodesOfClass(second.byId, 'rows', 'row__block').some(n => n.value === '§§'));
   assert.ok(second.byId.get('preview').innerHTML.includes('§§'));
 });
+
+// ---- install helpers ----
+
+test('the PowerShell one-liner targets the configured path in Windows form', () => {
+  const { byId } = boot();
+  const path = byId.get('install-path');
+  path.value = 'D:/tools/.claude/statusline.js';
+  path.fire('input');
+  const backslash = String.fromCharCode(92);
+  const command = byId.get('install-command').value;
+  assert.ok(command.startsWith('Get-Clipboard -Raw | Set-Content -Encoding utf8 "'), command);
+  assert.ok(command.endsWith('statusline.js"'), command);
+  assert.ok(command.includes('D:' + backslash + 'tools' + backslash + '.claude'), command);
+  assert.equal(command.includes('/'), false, 'forward slashes must be converted for PowerShell');
+  assert.match(byId.get('settings-snippet').value, /"node D:\/tools\/\.claude\/statusline\.js"/);
+});
+
+test('the command is a single line, so it survives copy and paste', () => {
+  const { byId } = boot();
+  assert.equal(byId.get('install-command').value.includes(String.fromCharCode(10)), false);
+});
+
+test('downloads use a binary mime type so browsers keep the .js name', () => {
+  const { byId, anchors } = boot();
+  byId.get('download').fire('click');
+  assert.equal(anchors[0].download, 'statusline.js');
+  assert.equal(anchors[0].clicks, 1);
+});

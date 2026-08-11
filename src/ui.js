@@ -143,6 +143,8 @@ export function mount() {
     loadFile: document.getElementById('load-file'),
     loadFileName: document.getElementById('load-file-name'),
     installPath: document.getElementById('install-path'),
+    installCommand: document.getElementById('install-command'),
+    copyCommand: document.getElementById('copy-command'),
     snippet: document.getElementById('settings-snippet'),
     sliders: [
       ['ctx', document.getElementById('pv-ctx'), document.getElementById('pv-ctx-out')],
